@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>map 0.20</title>
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
+    <meta charset="utf-8">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.4.4/proj4-src.js"></script>    
+    <style>
+      /* Always set the map height explicitly to define the size of the div
+       * element that contains the map. */
+      #map {
+        height: 100%;
+      }
+      /* Optional: Makes the sample page fill the window. */
+      html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+    <script>
+      // Note: This example requires that you consent to location sharing when
+      // prompted by your browser. If you see the error "The Geolocation service
+      // failed.", it means you probably did not give permission for the browser to
+      // locate you.
+      var map;
+      var id, infoWindow, marker, options
+      var current_location = {lat: 60.1889, lng: 24.7812};          // Espoo
+      //var current_location = {lat: 60.124932, lng: 24.439290};    // Kirkkonummi
+      var autoMove = true;
+      var showLynx = false;
+      var layerLynx = null;
+      var path = [];
+      var centerMarker;
+      var start_location = current_location;
+      var start_zoom = 15;
+      var start_maptypeid;
+
+      console.log('*** body ***');
+
+      restoreState();
+
+      // ------------------------------------------------------------
+      // save current state to session storage
+      function saveState() {
+        var map_center = map.getCenter();
+        console.log("saveState:lat="+map_center.lat()+",lng="+map_center.lng()+',Zoom='+map.getZoom()+'MapTypeId='+map.getMapTypeId()
+                     +'showLynx='+showLynx);
+        sessionStorage.setItem('Lat', String(map_center.lat()));
+        sessionStorage.setItem('Lng', String(map_center.lng()));
+        sessionStorage.setItem('Zoom', String(map.getZoom()));
+        sessionStorage.setItem('MapTypeId', map.getMapTypeId());
+        console.log("saveState:autoMove="+autoMove);
+        if (autoMove) {
+          sessionStorage.setItem('AutoMove', String('1'));          
+        } else {
+          sessionStorage.setItem('AutoMove', String('0'));
+        }
+        if (showLynx) {
+          sessionStorage.setItem('ShowLynx', String('1'));          
+        } else {
+          sessionStorage.setItem('ShowLynx', String('0'));
+        }
+      }
+
+      // ------------------------------------------------------------
+      // restore current state from session storate
+      function restoreState() {
+        if (sessionStorage.getItem('AutoMove')) {
+          var autoMoveNumber = Number(sessionStorage.getItem('AutoMove'));
+          if (autoMoveNumber) {
+            autoMove = true;
+          } else {
+            autoMove = false;
+          }
+          if (centerMarker) {
+            centerMarker.setVisible(!autoMove);
+          }
+          console.log("restoreState:autoMove="+autoMove);
+        } else {
+          console.log("restoreState:could not restore autoMove");
+        }
+        if (sessionStorage.getItem('Lat') 
+            && sessionStorage.getItem('Lng')
+            && sessionStorage.getItem('Zoom')
+            && sessionStorage.getItem('MapTypeId')) 
+        {
+          var pos = {
+                lat: Number(sessionStorage.getItem('Lat')),
+                lng: Number(sessionStorage.getItem('Lng'))
+          };
+          start_location = pos;
+          console.log("restoreState:lat="+pos.lat+",lng="+pos.lng+
+                      ',Zoom='+sessionStorage.getItem('Zoom')+
+                      ',MapTypeId='+sessionStorage.getItem('MapTypeId'));
+          start_maptypeid = sessionStorage.getItem('MapTypeId');       
+          start_zoom = Number(sessionStorage.getItem('Zoom'));
+          if (map) {
+            map.setMapTypeId(start_maptypeid);
+            map.setZoom(start_zoom);
+            map.panTo(pos);
+          }
+        } else {
+          console.log("restoreState:could not restore lat,lng,Zoom,MapTypeId");          
+        }
+        if (sessionStorage.getItem('ShowLynx')) {
+          var showLynxNumber = Number(sessionStorage.getItem('ShowLynx'));
+          if (showLynxNumber) {
+            showLynx = true;
+            if (map) {
+              loadLynxLayer();
+              layerLynx.setMap(map);
+            }
+          } else {
+            showLynx = false;
+          }
+          console.log("restoreState:showLynx="+showLynx);
+        } else {
+          console.log("restoreState:could not restore ShowLynx");
+        }         
+      }
+
+      // ------------------------------------------------------------
+      // Custom control to center the map
+        
+      function CenterControl(controlDiv, map) {
+
+        // Custom control to center the
+        // Set CSS for the control border.
+        var controlUI = document.createElement('div');
+        controlUI.style.backgroundColor = '#fff';
+        controlUI.style.border = '2px solid #fff';
+        controlUI.style.borderRadius = '3px';
+        controlUI.style.boxShadow = '0 2px 6px rgba(0,0,0,.3)';
+        controlUI.style.cursor = 'pointer';
+        controlUI.style.marginBottom = '22px';
+        controlUI.style.textAlign = 'center';
+        controlUI.title = 'Click to recenter the map';
+        controlDiv.appendChild(controlUI);
+
+        // Set CSS for the control interior.
+        var controlText = document.createElement('div');
+        controlText.style.color = 'rgb(25,25,25)';
+        controlText.style.fontFamily = 'Roboto,Arial,sans-serif';
+        controlText.style.fontSize = '12px';
+        controlText.style.lineHeight = '26px';
+        controlText.style.paddingLeft = '5px';
+        controlText.style.paddingRight = '5px';
+        controlText.innerHTML = 'GPS';
+        controlUI.appendChild(controlText);
+
+        // Setup the click event listeners: center to current position
+        controlUI.addEventListener('click', function() {
+          map.panTo(current_location);
+          autoMove = true;
+          centerMarker.setVisible(!autoMove);
+          console.log("click Center Map:autoMove=true");
+        });        
+      }
+
+      // ------------------------------------------------------------
+      // Link to 1956 aerial images
+
+      function Aerial1956Control(controlDiv, map) {
+
+        // Custom control to center the
+        // Set CSS for the control border.
+        var controlUI = document.createElement('div');
+        controlUI.style.backgroundColor = '#fff';
+        controlUI.style.border = '2px solid #fff';
+        controlUI.style.borderRadius = '3px';
+        controlUI.style.boxShadow = '0 2px 6px rgba(0,0,0,.3)';
+        controlUI.style.cursor = 'pointer';
+        controlUI.style.marginBottom = '22px';
+        controlUI.style.textAlign = 'center';
+        controlUI.title = 'Click to go to 1956 aerial map';
+        controlDiv.appendChild(controlUI);
+
+        // Set CSS for the control interior.
+        var controlText = document.createElement('div');
+        controlText.style.color = 'rgb(25,25,25)';
+        controlText.style.fontFamily = 'Roboto,Arial,sans-serif';
+        controlText.style.fontSize = '12px';
+        controlText.style.lineHeight = '26px';
+        controlText.style.paddingLeft = '5px';
+        controlText.style.paddingRight = '5px';
+        controlText.innerHTML = '1956';
+        controlUI.appendChild(controlText);
+
+        // Setup the click event listeners: aerial images from 1956
+        controlUI.addEventListener('click', function() {
+          // save current state in case we return back
+          saveState();          
+          // ETRS-GK25 (EPSG:3879)
+          var p = "+proj=tmerc +lat_0=0 +lon_0=25 +k=1 +x_0=25500000 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs";
+          proj4.defs("ETRS-GK25", p);
+          var map_center = map.getCenter();
+          // convert map coordinates to ETRS-GK25 (EPSG:3879) that is used for aerial photos
+          var coord = proj4('ETRS-GK25', [map_center.lng(), map_center.lat()]);
+          var link = "https://kirkkonummi.karttatiimi.fi/?setlanguage=fi&e="+coord[0]+"&n="+coord[1]+"&r=1&w=&l=1956ortoilmakuva&o=100"+
+                     "&geom=POINT("+coord[0]+"%20"+coord[1]+")";
+          console.log("click 1956: jump to page " + link);
+          //alert('jump to 1956');
+          window.location.href = link;
+        });        
+      }
+
+      // ------------------------------------------------------------
+      // Link to laser images
+
+      function LaserControl(controlDiv, map) {
+
+        // Custom control to center the
+        // Set CSS for the control border.
+        var controlUI = document.createElement('div');
+        controlUI.style.backgroundColor = '#fff';
+        controlUI.style.border = '2px solid #fff';
+        controlUI.style.borderRadius = '3px';
+        controlUI.style.boxShadow = '0 2px 6px rgba(0,0,0,.3)';
+        controlUI.style.cursor = 'pointer';
+        controlUI.style.marginBottom = '22px';
+        controlUI.style.textAlign = 'center';
+        controlUI.title = 'Click to go to MML Laser image';
+        controlDiv.appendChild(controlUI);
+
+        // Set CSS for the control interior.
+        var controlText = document.createElement('div');
+        controlText.style.color = 'rgb(25,25,25)';
+        controlText.style.fontFamily = 'Roboto,Arial,sans-serif';
+        controlText.style.fontSize = '12px';
+        controlText.style.lineHeight = '26px';
+        controlText.style.paddingLeft = '5px';
+        controlText.style.paddingRight = '5px';
+        controlText.innerHTML = 'MML Laser';
+        controlUI.appendChild(controlText);
+
+        // Setup the click event listeners: MML laser images
+        controlUI.addEventListener('click', function() {
+          // save current state in case we return back
+          saveState();          
+          // ETRS-TM35FIN (EPSG:3067)
+          var p = "+proj=utm +zone=35 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs";
+          proj4.defs("ETRS-TM35FIN", p);
+          var map_center = map.getCenter();
+          // convert map coordinates to ETRS-TM35FIN (EPSG:3067) that is used for maanmittauslaitos maps
+          var coord = proj4('ETRS-TM35FIN', [map_center.lng(), map_center.lat()]);
+          var link = "https://asiointi.maanmittauslaitos.fi/karttapaikka/?share=customMarker&"+
+                     "n="+coord[1]+"&e="+coord[0]+
+                     "&desc=&zoom=10&layers=%5B%7B%22id%22%3A186%2C%22opacity%22%3A50%7D%5D";
+          console.log("click Laser: jump to page " + link);
+          //alert('jump to MML');
+          window.location.href = link;
+        });        
+      }
+
+      // ------------------------------------------------------------
+      // Lynx
+
+      function loadLynxLayer() {
+        if (!layerLynx) {
+          console.log("loadLynxLayer:create new layer");
+          layerLynx = new google.maps.KmlLayer('https://ruuth.xyz/Lynx.kmz', {
+              preserveViewport: true,
+              suppressInfoWindows: false 
+          });
+        }
+      }
+
+      function LynxControl(controlDiv, map) {
+
+        // Custom control to center the
+        // Set CSS for the control border.
+        var controlUI = document.createElement('div');
+        controlUI.style.backgroundColor = '#fff';
+        controlUI.style.border = '2px solid #fff';
+        controlUI.style.borderRadius = '3px';
+        controlUI.style.boxShadow = '0 2px 6px rgba(0,0,0,.3)';
+        controlUI.style.cursor = 'pointer';
+        controlUI.style.marginBottom = '22px';
+        controlUI.style.textAlign = 'center';
+        controlUI.title = 'Lynx paranteesi suunnistuskartalle';
+        controlDiv.appendChild(controlUI);
+
+        // Set CSS for the control interior.
+        var controlText = document.createElement('div');
+        controlText.style.color = 'rgb(25,25,25)';
+        controlText.style.fontFamily = 'Roboto,Arial,sans-serif';
+        controlText.style.fontSize = '12px';
+        controlText.style.lineHeight = '26px';
+        controlText.style.paddingLeft = '5px';
+        controlText.style.paddingRight = '5px';
+        controlText.innerHTML = 'Lynx';
+        controlUI.appendChild(controlText);
+
+        // Setup the click event listeners: toggle Lynx layer
+        controlUI.addEventListener('click', function() {
+          if (!showLynx) {
+              // enable layer
+              showLynx = true;
+              console.log("click Lynx: enable layer");                
+              loadLynxLayer();
+              layerLynx.setMap(map);
+          } else {
+              // disable layer              
+              showLynx = false;
+              if (layerLynx) {
+                console.log("click Lynx: disable layer");                
+                layerLynx.setMap(null);
+              } else {
+                console.log("click Lynx: disable layer, null layerLynx");                
+              }
+          }
+        });        
+      }
+
+      // ------------------------------------------------------------
+      // Init map
+
+      function initMap() {
+        if (!start_maptypeid) {
+          start_maptypeid = google.maps.MapTypeId.ROADMAP;
+        }
+        map = new google.maps.Map(document.getElementById('map'), {
+          center: start_location,
+          zoom : start_zoom,
+          mapTypeId : start_maptypeid,
+          mapTypeControlOptions: {
+            mapTypeIds: [
+                google.maps.MapTypeId.ROADMAP,
+                google.maps.MapTypeId.SATELLITE,
+                'peruskartta',
+                'ortokuvat'
+            ]
+          }
+        });
+
+        var crosshairShape = {coords:[0,0,0,0],type:'rect'};
+        centerMarker = new google.maps.Marker({
+          map: map,
+          icon: 'https://www.daftlogic.com/images/cross-hairs.gif',
+          shape: crosshairShape
+        });
+        centerMarker.bindTo('position', map, 'center');
+        centerMarker.setVisible(!autoMove);
+
+        // ------------------------------------------------------------
+        // Peruskartta 
+
+        var perusMapType = new google.maps.ImageMapType({
+          getTileUrl: function(coord, zoom) {
+              return "http://tiles.kartat.kapsi.fi/peruskartta/" + zoom + "/" + 
+                coord.x + "/" + coord.y + ".jpg";
+          },
+          tileSize: new google.maps.Size(256, 256),
+          maxZoom: 19,
+          minZoom: 0,
+          name: 'Peruskartta'
+        });
+
+        map.mapTypes.set('peruskartta', perusMapType);
+        //map.setMapTypeId('peruskartta'); // default is roadmap
+
+        // ------------------------------------------------------------
+        // Ortoilmakuvat
+
+        var ortoMapType = new google.maps.ImageMapType({
+          getTileUrl: function(coord, zoom) {
+              return "http://tiles.kartat.kapsi.fi/ortokuva/" + zoom + "/" + 
+                coord.x + "/" + coord.y + ".jpg";
+          },
+          tileSize: new google.maps.Size(256, 256),
+          maxZoom: 19,
+          minZoom: 0,
+          name: 'Ortoilmakuvat'
+        });
+
+        map.mapTypes.set('ortokuvat', ortoMapType);
+
+        // ------------------------------------------------------------
+        // Init some variables
+
+        marker = null;
+        infoWindow = new google.maps.InfoWindow;
+
+        // ----------------------------------------------------------
+        // Create the DIV to hold the control and call the CenterControl()
+        // constructor passing in this DIV.
+        var centerControlDiv = document.createElement('div');
+        var centerControl = new CenterControl(centerControlDiv, map);
+        centerControlDiv.index = 1;
+        map.controls[google.maps.ControlPosition.RIGHT_CENTER].push(centerControlDiv);
+
+        var aerial1956ControlDiv = document.createElement('div');
+        var aerial1956Control = new Aerial1956Control(aerial1956ControlDiv, map);
+        aerial1956ControlDiv.index = 2;
+        map.controls[google.maps.ControlPosition.BOTTOM_LEFT].push(aerial1956ControlDiv);
+
+        var laserControlDiv = document.createElement('div');
+        var laserControl = new LaserControl(laserControlDiv, map);
+        laserControlDiv.index = 3;
+        map.controls[google.maps.ControlPosition.BOTTOM_CENTER].push(laserControlDiv);   
+        
+        var lynxControlDiv = document.createElement('div');
+        var lynxControl = new LynxControl(lynxControlDiv, map);
+        lynxControlDiv.index = 4;
+        map.controls[google.maps.ControlPosition.LEFT_CENTER].push(lynxControlDiv);          
+
+        // ------------------------------------------------------------
+        // Geolocation error
+
+        function handleLocationError(browserHasGeolocation, infoWindow, pos) {
+          var msg = browserHasGeolocation ?
+                                'Error: The Geolocation service failed.' :
+                                'Error: Your browser doesn\'t support geolocation.';
+          console.log(msg);
+          infoWindow.setPosition(pos);
+          infoWindow.setContent(msg);
+          infoWindow.open(map);
+        }
+
+        // ------------------------------------------------------------
+        // Event listener for map type change (toggle stree view)
+
+        map.addListener('maptypeid_changed', function() {
+          var showStreetViewControl = map.getMapTypeId() != 'peruskartta'
+                                      && map.getMapTypeId() != 'ortokuvat';
+          map.setOptions({
+            streetViewControl: showStreetViewControl
+          });
+        });
+
+        // ------------------------------------------------------------
+        // Event listener for user moving the map manually
+
+        map.addListener('dragstart', function() {
+            if (autoMove) {
+              console.log('dragstart: set autoMove=false');
+            }
+            autoMove = false;
+            centerMarker.setVisible(!autoMove);
+        });
+
+        // ------------------------------------------------------------
+        // Options for getting position
+
+        options = {
+          enableHighAccuracy: true,
+          timeout: Infinity,
+          maximumAge: 10000
+        };
+
+        // ------------------------------------------------------------
+        // Try HTML5 geolocation.
+
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                updatePosition, 
+                function() {
+                    handleLocationError(true, infoWindow, map.getCenter());
+            });
+            id = navigator.geolocation.watchPosition(updatePosition, watchError, options);
+        } else {
+          // Browser doesn't support Geolocation
+          handleLocationError(false, infoWindow, map.getCenter());
+        }
+      }
+
+      // ------------------------------------------------------------
+      // Update current position in the map
+
+      function updatePosition(position) {  
+            var pos = {
+                lat: position.coords.latitude,
+                lng: position.coords.longitude
+            };
+            current_location = pos;
+            if (marker) {
+                // move marker
+                marker.setPosition(current_location);
+            } else {
+                // create marker
+                marker = new google.maps.Marker({
+                    position: current_location,
+                    map: map                 
+                });
+                // click the marker to get coordinates
+                marker.addListener('click', function() {
+                    infoWindow.setPosition(current_location);
+                    infoWindow.setContent('Lat: ' + current_location.lat + ' Lng: ' + current_location.lng);
+                    infoWindow.open(map);
+                  });
+            }
+            if (autoMove) {
+              map.panTo(current_location);
+            }
+      }
+
+      // ------------------------------------------------------------
+      // Error function for position change watch
+
+      function watchError(err) {
+        infoWindow.setPosition(pos);
+        infoWindow.setContent('Watch Error(' + err.code + '): ' + err.message);
+        console.log('Watch Error(' + err.code + '): ' + err.message);
+        infoWindow.open(map);
+      }
+
+      // ------------------------------------------------------------
+      // add event listeners for page show/hide so we can continue 
+      // from same state
+
+      window.addEventListener('pageshow', function(event) {
+        console.log("pageshow");
+        restoreState();
+      });
+
+      window.addEventListener('pagehide', function(event) {
+        console.log("pagehide");
+        saveState();
+      });
+
+      // ------------------------------------------------------------
+      // function to be called periodically to show path
+      setInterval(function() {
+        var new_pos;
+        var distance;
+        if (path.length > 0) {
+          // check that we have moved enough to add a new marker
+          distance = google.maps.geometry.spherical.computeDistanceBetween(
+                      new google.maps.LatLng(current_location),
+                      path[path.length-1].getCenter());
+          if (distance < 10) {
+            console.log('Do not add new element, too short distance='+distance+',path.length='+path.length);
+            return;
+          }
+        }        
+        if (path.length >= 10) {
+          // Hide oldest element
+          console.log('Hide oldest path element, path.length='+path.length+',distance='+distance);
+          path[0].setMap(null);
+          // Make room for a new element at the end
+          for (var i = 1; i < path.length; i++) {
+            path[i-1] = path[i];
+          }
+          new_pos = 9;
+        } else {
+          console.log('Add new path element, path.length='+path.length+',distance='+distance);
+          new_pos = path.length;
+        }
+        // Add new circle to the map.
+        path[new_pos] = new google.maps.Circle({
+                              strokeColor: '#FF0000',
+                              strokeOpacity: 0.8,
+                              strokeWeight: 2,
+                              fillColor: '#FF0000',
+                              fillOpacity: 0.35,
+                              map: map,
+                              center: current_location,
+                              radius: 5,
+                              clickable : false
+                            });
+      }, 10000);
+
+    </script>
+    <script async defer
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyA1wlBXvTtUzuhgNudFux14Gn_okpmWztY&callback=initMap">
+    </script>
+  </body>
+</html>
