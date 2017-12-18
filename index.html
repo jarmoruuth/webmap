@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>map 0.20</title>
+    <title>map 0.21</title>
     <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
     <meta charset="utf-8">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.4.4/proj4-src.js"></script>    
@@ -33,6 +33,8 @@
       var autoMove = true;
       var showLynx = false;
       var layerLynx = null;
+      var showJarmo = false;
+      var layerJarmo = null;
       var path = [];
       var centerMarker;
       var start_location = current_location;
@@ -45,37 +47,43 @@
 
       // ------------------------------------------------------------
       // save current state to session storage
+
+      function saveBool(name, val) {
+        if (val) {
+          sessionStorage.setItem(name, String('1'));          
+        } else {
+          sessionStorage.setItem(name, String('0'));
+        }
+      }
+
       function saveState() {
         var map_center = map.getCenter();
         console.log("saveState:lat="+map_center.lat()+",lng="+map_center.lng()+',Zoom='+map.getZoom()+'MapTypeId='+map.getMapTypeId()
-                     +'showLynx='+showLynx);
+                     +'showLynx='+showLynx+'showJarmo='+showJarmo);
         sessionStorage.setItem('Lat', String(map_center.lat()));
         sessionStorage.setItem('Lng', String(map_center.lng()));
         sessionStorage.setItem('Zoom', String(map.getZoom()));
         sessionStorage.setItem('MapTypeId', map.getMapTypeId());
         console.log("saveState:autoMove="+autoMove);
-        if (autoMove) {
-          sessionStorage.setItem('AutoMove', String('1'));          
-        } else {
-          sessionStorage.setItem('AutoMove', String('0'));
-        }
-        if (showLynx) {
-          sessionStorage.setItem('ShowLynx', String('1'));          
-        } else {
-          sessionStorage.setItem('ShowLynx', String('0'));
-        }
+        saveBool('AutoMove', autoMove);          
+        saveBool('ShowLynx', showLynx);          
+        saveBool('ShowJarmo', showJarmo);          
       }
 
       // ------------------------------------------------------------
       // restore current state from session storate
+
+      function restoreBool(name) {
+        var num = Number(sessionStorage.getItem(name));
+          if (num) {
+            return true;
+          } else {
+            return false;
+          }
+      }
       function restoreState() {
         if (sessionStorage.getItem('AutoMove')) {
-          var autoMoveNumber = Number(sessionStorage.getItem('AutoMove'));
-          if (autoMoveNumber) {
-            autoMove = true;
-          } else {
-            autoMove = false;
-          }
+          autoMove = restoreBool('AutoMove');
           if (centerMarker) {
             centerMarker.setVisible(!autoMove);
           }
@@ -107,20 +115,29 @@
           console.log("restoreState:could not restore lat,lng,Zoom,MapTypeId");          
         }
         if (sessionStorage.getItem('ShowLynx')) {
-          var showLynxNumber = Number(sessionStorage.getItem('ShowLynx'));
-          if (showLynxNumber) {
-            showLynx = true;
+          showLynx = restoreBool('ShowLynx');
+          if (showLynx) {
             if (map) {
               loadLynxLayer();
               layerLynx.setMap(map);
             }
-          } else {
-            showLynx = false;
           }
           console.log("restoreState:showLynx="+showLynx);
         } else {
           console.log("restoreState:could not restore ShowLynx");
-        }         
+        }        
+        if (sessionStorage.getItem('ShowJarmo')) {
+          showJarmo = restoreBool('ShowJarmo');
+          if (showJarmo) {
+            if (map) {
+              loadJarmoLayer();
+              layerJarmo.setMap(map);
+            }
+          }
+          console.log("restoreState:showJarmo="+showJarmo);
+        } else {
+          console.log("restoreState:could not restore ShowJarmo");
+        }               
       }
 
       // ------------------------------------------------------------
@@ -257,7 +274,7 @@
       }
 
       // ------------------------------------------------------------
-      // Lynx
+      // load Lynx and Jarmo layers
 
       function loadLynxLayer() {
         if (!layerLynx) {
@@ -269,51 +286,14 @@
         }
       }
 
-      function LynxControl(controlDiv, map) {
-
-        // Custom control to center the
-        // Set CSS for the control border.
-        var controlUI = document.createElement('div');
-        controlUI.style.backgroundColor = '#fff';
-        controlUI.style.border = '2px solid #fff';
-        controlUI.style.borderRadius = '3px';
-        controlUI.style.boxShadow = '0 2px 6px rgba(0,0,0,.3)';
-        controlUI.style.cursor = 'pointer';
-        controlUI.style.marginBottom = '22px';
-        controlUI.style.textAlign = 'center';
-        controlUI.title = 'Lynx paranteesi suunnistuskartalle';
-        controlDiv.appendChild(controlUI);
-
-        // Set CSS for the control interior.
-        var controlText = document.createElement('div');
-        controlText.style.color = 'rgb(25,25,25)';
-        controlText.style.fontFamily = 'Roboto,Arial,sans-serif';
-        controlText.style.fontSize = '12px';
-        controlText.style.lineHeight = '26px';
-        controlText.style.paddingLeft = '5px';
-        controlText.style.paddingRight = '5px';
-        controlText.innerHTML = 'Lynx';
-        controlUI.appendChild(controlText);
-
-        // Setup the click event listeners: toggle Lynx layer
-        controlUI.addEventListener('click', function() {
-          if (!showLynx) {
-              // enable layer
-              showLynx = true;
-              console.log("click Lynx: enable layer");                
-              loadLynxLayer();
-              layerLynx.setMap(map);
-          } else {
-              // disable layer              
-              showLynx = false;
-              if (layerLynx) {
-                console.log("click Lynx: disable layer");                
-                layerLynx.setMap(null);
-              } else {
-                console.log("click Lynx: disable layer, null layerLynx");                
-              }
-          }
-        });        
+      function loadJarmoLayer() {
+        if (!layerJarmo) {
+          console.log("loadJarmoLayer:create new layer");
+          layerJarmo = new google.maps.KmlLayer('https://ruuth.xyz/EspoonLahiretkia.kmz', {
+              preserveViewport: true,
+              suppressInfoWindows: false 
+          });
+        }
       }
 
       // ------------------------------------------------------------
@@ -336,6 +316,62 @@
             ]
           }
         });
+
+        // ------------------------------------------------------------
+        // DropDown menu
+
+        var categoryDropDown = document.createElement("SELECT");
+
+        var option = document.createElement("option");
+        option.text = "Select";
+        categoryDropDown.add(option, 0);
+
+        option = document.createElement("option");
+        option.text = "Lynx";
+        categoryDropDown.add(option, 1);
+        
+        option = document.createElement("option");
+        option.text = "Jarmo";
+        categoryDropDown.add(option, 2);
+
+        categoryDropDown.addEventListener("change", function() {
+          var selIndex = categoryDropDown.selectedIndex;
+          console.log("categoryDropDown.selectedIndex=", selIndex);
+          // hide all layers
+          if (showJarmo) {
+            // hide Jarmo layer              
+            showJarmo = false;
+            if (layerJarmo) {
+              console.log("hide Jarmo layer");                
+              layerJarmo.setMap(null);             
+            }
+          }             
+          if (showLynx) {
+              // hide Lynx layer              
+              showLynx = false;
+              if (layerLynx) {
+                console.log("hide Lynx layer");                
+                layerLynx.setMap(null);             
+              }
+            }
+          if (selIndex == 1) {
+            // Lynx
+            // enable layer
+            showLynx = true;
+            console.log("show Lynx layer");                
+            loadLynxLayer();
+            layerLynx.setMap(map);
+          } else if (selIndex == 2) {
+            // Jarmo
+            // enable layer
+            showJarmo = true;
+            console.log("show Jarmo layer");                
+            loadJarmoLayer();
+            layerJarmo.setMap(map);      
+          }
+        });
+
+        map.controls[google.maps.ControlPosition.LEFT_CENTER].push(categoryDropDown);
 
         var crosshairShape = {coords:[0,0,0,0],type:'rect'};
         centerMarker = new google.maps.Marker({
@@ -401,12 +437,7 @@
         var laserControlDiv = document.createElement('div');
         var laserControl = new LaserControl(laserControlDiv, map);
         laserControlDiv.index = 3;
-        map.controls[google.maps.ControlPosition.BOTTOM_CENTER].push(laserControlDiv);   
-        
-        var lynxControlDiv = document.createElement('div');
-        var lynxControl = new LynxControl(lynxControlDiv, map);
-        lynxControlDiv.index = 4;
-        map.controls[google.maps.ControlPosition.LEFT_CENTER].push(lynxControlDiv);          
+        map.controls[google.maps.ControlPosition.BOTTOM_CENTER].push(laserControlDiv);             
 
         // ------------------------------------------------------------
         // Geolocation error
