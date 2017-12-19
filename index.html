@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>map 0.21</title>
+    <title>map 0.22</title>
     <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
     <meta charset="utf-8">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.4.4/proj4-src.js"></script>    
@@ -28,7 +28,7 @@
       // locate you.
       var map;
       var id, infoWindow, marker, options
-      var current_location = {lat: 60.1889, lng: 24.7812};          // Espoo
+      var current_location = {lat: 60.2053791, lng: 24.6540694};          // Espoo
       //var current_location = {lat: 60.124932, lng: 24.439290};    // Kirkkonummi
       var autoMove = true;
       var showLynx = false;
@@ -40,8 +40,16 @@
       var start_location = current_location;
       var start_zoom = 15;
       var start_maptypeid;
+      var layerDialog;
+      var supportHTML5Dialog;
 
       console.log('*** body ***');
+
+      if (typeof HTMLDialogElement === 'function') {
+        supportHTML5Dialog = true;
+      } else {
+        supportHTML5Dialog = false;
+      }
 
       restoreState();
 
@@ -115,25 +123,13 @@
           console.log("restoreState:could not restore lat,lng,Zoom,MapTypeId");          
         }
         if (sessionStorage.getItem('ShowLynx')) {
-          showLynx = restoreBool('ShowLynx');
-          if (showLynx) {
-            if (map) {
-              loadLynxLayer();
-              layerLynx.setMap(map);
-            }
-          }
+          handleLynxLayer(restoreBool('ShowLynx'));
           console.log("restoreState:showLynx="+showLynx);
         } else {
           console.log("restoreState:could not restore ShowLynx");
         }        
         if (sessionStorage.getItem('ShowJarmo')) {
-          showJarmo = restoreBool('ShowJarmo');
-          if (showJarmo) {
-            if (map) {
-              loadJarmoLayer();
-              layerJarmo.setMap(map);
-            }
-          }
+          handleLynxLayer(restoreBool('ShowJarmo'));
           console.log("restoreState:showJarmo="+showJarmo);
         } else {
           console.log("restoreState:could not restore ShowJarmo");
@@ -141,10 +137,9 @@
       }
 
       // ------------------------------------------------------------
-      // Custom control to center the map
-        
-      function CenterControl(controlDiv, map) {
+      // Custom control button defintion
 
+      function textButton(controlDiv, text, title) {
         // Custom control to center the
         // Set CSS for the control border.
         var controlUI = document.createElement('div');
@@ -155,7 +150,7 @@
         controlUI.style.cursor = 'pointer';
         controlUI.style.marginBottom = '22px';
         controlUI.style.textAlign = 'center';
-        controlUI.title = 'Click to recenter the map';
+        controlUI.title = title;
         controlDiv.appendChild(controlUI);
 
         // Set CSS for the control interior.
@@ -166,8 +161,18 @@
         controlText.style.lineHeight = '26px';
         controlText.style.paddingLeft = '5px';
         controlText.style.paddingRight = '5px';
-        controlText.innerHTML = 'GPS';
+        controlText.innerHTML = text;
         controlUI.appendChild(controlText);
+
+        return controlUI;
+      }
+
+      // ------------------------------------------------------------
+      // Custom control to center the map
+        
+      function CenterControl(controlDiv, map) {
+
+        var controlUI = textButton(controlDiv, 'GPS', 'Click to recenter the map');
 
         // Setup the click event listeners: center to current position
         controlUI.addEventListener('click', function() {
@@ -183,29 +188,7 @@
 
       function Aerial1956Control(controlDiv, map) {
 
-        // Custom control to center the
-        // Set CSS for the control border.
-        var controlUI = document.createElement('div');
-        controlUI.style.backgroundColor = '#fff';
-        controlUI.style.border = '2px solid #fff';
-        controlUI.style.borderRadius = '3px';
-        controlUI.style.boxShadow = '0 2px 6px rgba(0,0,0,.3)';
-        controlUI.style.cursor = 'pointer';
-        controlUI.style.marginBottom = '22px';
-        controlUI.style.textAlign = 'center';
-        controlUI.title = 'Click to go to 1956 aerial map';
-        controlDiv.appendChild(controlUI);
-
-        // Set CSS for the control interior.
-        var controlText = document.createElement('div');
-        controlText.style.color = 'rgb(25,25,25)';
-        controlText.style.fontFamily = 'Roboto,Arial,sans-serif';
-        controlText.style.fontSize = '12px';
-        controlText.style.lineHeight = '26px';
-        controlText.style.paddingLeft = '5px';
-        controlText.style.paddingRight = '5px';
-        controlText.innerHTML = '1956';
-        controlUI.appendChild(controlText);
+        var controlUI = textButton(controlDiv, '1956', 'Click to go to 1956 aerial map');
 
         // Setup the click event listeners: aerial images from 1956
         controlUI.addEventListener('click', function() {
@@ -226,33 +209,27 @@
       }
 
       // ------------------------------------------------------------
+      // Layer button to open dialog, only if HTML5 dialog is supported
+
+      if (supportHTML5Dialog) {
+        function LayerControl(controlDiv, map) {
+
+          var controlUI = textButton(controlDiv, 'Layers', 'Click to select layers');
+
+          // Setup the click event listeners: layer dialog
+          controlUI.addEventListener('click', function() {
+            console.log("click Layer, layerDialog.showModal()");
+            layerDialog.showModal();
+          });        
+        }
+      }
+
+      // ------------------------------------------------------------
       // Link to laser images
 
       function LaserControl(controlDiv, map) {
 
-        // Custom control to center the
-        // Set CSS for the control border.
-        var controlUI = document.createElement('div');
-        controlUI.style.backgroundColor = '#fff';
-        controlUI.style.border = '2px solid #fff';
-        controlUI.style.borderRadius = '3px';
-        controlUI.style.boxShadow = '0 2px 6px rgba(0,0,0,.3)';
-        controlUI.style.cursor = 'pointer';
-        controlUI.style.marginBottom = '22px';
-        controlUI.style.textAlign = 'center';
-        controlUI.title = 'Click to go to MML Laser image';
-        controlDiv.appendChild(controlUI);
-
-        // Set CSS for the control interior.
-        var controlText = document.createElement('div');
-        controlText.style.color = 'rgb(25,25,25)';
-        controlText.style.fontFamily = 'Roboto,Arial,sans-serif';
-        controlText.style.fontSize = '12px';
-        controlText.style.lineHeight = '26px';
-        controlText.style.paddingLeft = '5px';
-        controlText.style.paddingRight = '5px';
-        controlText.innerHTML = 'MML Laser';
-        controlUI.appendChild(controlText);
+        var controlUI = textButton(controlDiv, 'MML Laser', 'Click to select MML laser scan maps');
 
         // Setup the click event listeners: MML laser images
         controlUI.addEventListener('click', function() {
@@ -297,6 +274,51 @@
       }
 
       // ------------------------------------------------------------
+      // Handle layer show/hide
+
+      function handleLynxLayer(showLayer) {
+        if (showLayer == showLynx) {
+          // no change
+          console.log("handleLynxLayer:no change, showLynx=", showLynx);
+          return;
+        }
+        showLynx = showLayer;
+        if (showLayer) {
+            console.log("handleLynxLayer:show Lynx layer, showLynx=", showLynx);
+            loadLynxLayer();
+            if (map) {
+              layerLynx.setMap(map);
+            }
+        } else {
+          console.log("handleLynxLayer:hide Lynx layer, showLynx=", showLynx);
+          if (map) {
+              layerLynx.setMap(null);
+            }
+        }
+      }
+
+      function handleJarmoLayer(showLayer) {
+        if (showLayer == showJarmo) {
+          // no change
+          console.log("handleJarmoLayer:no change, showJarmo=", showJarmo);
+          return;
+        }
+        showJarmo = showLayer;
+        if (showLayer) {
+            console.log("handleJarmoLayer:show Jarmo layer, showJarmo=", showJarmo);
+            loadJarmoLayer();
+            if (map) {
+              layerJarmo.setMap(map);
+            }
+        } else {
+          console.log("handleJarmoLayer:hide Jarmo layer, showJarmo=", showJarmo);
+          if (map) {
+              layerJarmo.setMap(null);
+            }
+        }
+      }
+      
+      // ------------------------------------------------------------
       // Init map
 
       function initMap() {
@@ -318,60 +340,98 @@
         });
 
         // ------------------------------------------------------------
-        // DropDown menu
+        // DropDown menu when HTML5 dialog is not supported
 
-        var categoryDropDown = document.createElement("SELECT");
+        if (!supportHTML5Dialog) {
 
-        var option = document.createElement("option");
-        option.text = "Select";
-        categoryDropDown.add(option, 0);
+          var categoryDropDown = document.createElement("SELECT");
 
-        option = document.createElement("option");
-        option.text = "Lynx";
-        categoryDropDown.add(option, 1);
-        
-        option = document.createElement("option");
-        option.text = "Jarmo";
-        categoryDropDown.add(option, 2);
+          var option = document.createElement("option");
+          option.text = "Select layer";
+          categoryDropDown.add(option, 0);
 
-        categoryDropDown.addEventListener("change", function() {
-          var selIndex = categoryDropDown.selectedIndex;
-          console.log("categoryDropDown.selectedIndex=", selIndex);
-          // hide all layers
-          if (showJarmo) {
-            // hide Jarmo layer              
-            showJarmo = false;
-            if (layerJarmo) {
-              console.log("hide Jarmo layer");                
-              layerJarmo.setMap(null);             
-            }
-          }             
+          option = document.createElement("option");
+          option.text = "Lynx";
+          categoryDropDown.add(option, 1);
+          
+          option = document.createElement("option");
+          option.text = "Jarmo";
+          categoryDropDown.add(option, 2);
+
           if (showLynx) {
-              // hide Lynx layer              
-              showLynx = false;
-              if (layerLynx) {
-                console.log("hide Lynx layer");                
-                layerLynx.setMap(null);             
-              }
-            }
-          if (selIndex == 1) {
-            // Lynx
-            // enable layer
-            showLynx = true;
-            console.log("show Lynx layer");                
-            loadLynxLayer();
-            layerLynx.setMap(map);
-          } else if (selIndex == 2) {
-            // Jarmo
-            // enable layer
-            showJarmo = true;
-            console.log("show Jarmo layer");                
-            loadJarmoLayer();
-            layerJarmo.setMap(map);      
+            categoryDropDown.selectedIndex = 1;
+          } else if (showJarmo) {
+            categoryDropDown.selectedIndex = 2;
+          } else {
+            categoryDropDown.selectedIndex = 0;
           }
-        });
 
-        map.controls[google.maps.ControlPosition.LEFT_CENTER].push(categoryDropDown);
+          categoryDropDown.addEventListener("change", function() {
+            var selIndex = categoryDropDown.selectedIndex;
+            console.log("categoryDropDown.selectedIndex=", selIndex);
+            // hide all layers
+            handleLynxLayer(false);
+            handleJarmoLayer(false);
+            if (selIndex == 1) {
+              // Lynx
+              handleLynxLayer(true);
+            } else if (selIndex == 2) {
+              // Jarmo
+              handleJarmoLayer(true);            
+            }
+          });
+
+          map.controls[google.maps.ControlPosition.LEFT_CENTER].push(categoryDropDown);
+        }
+
+        // ------------------------------------------------------------
+        // Dialog  menu to chhose layers, with dialog menu multiple
+        // layers can be visible at the same time
+
+        if (supportHTML5Dialog) {
+          layerDialog = document.createElement("DIALOG");
+
+          // Lynx check box
+          layerDialog.appendChild(document.createTextNode("Lynx layer"));
+          var checkBox = document.createElement("INPUT");
+          checkBox.setAttribute("type", "checkbox");
+          checkBox.value = 'Lynx';
+          checkBox.checked = showLynx;
+          checkBox.onclick = function(){
+            console.log("layerDialog Lynx clicked, value=", this.checked);
+            handleLynxLayer(this.checked);
+          };
+          layerDialog.appendChild(checkBox);
+          
+          layerDialog.appendChild(document.createElement("BR"));
+          
+          // Jarmo checkbox
+          layerDialog.appendChild(document.createTextNode("Jarmo layer"));
+          checkBox = document.createElement("INPUT");
+          checkBox.setAttribute("type", "checkbox");
+          checkBox.value = 'Jarmo';
+          checkBox.checked = showJarmo;
+          checkBox.onclick = function(){
+            console.log("layerDialog Jarmo clicked, value=", this.checked);
+            handleJarmoLayer(this.checked);
+          };
+          layerDialog.appendChild(checkBox);
+          document.body.appendChild(layerDialog);
+
+          layerDialog.appendChild(document.createElement("BR"));
+
+          // Close button
+          var layerCloseButton = document.createElement("BUTTON");
+          layerCloseButton.appendChild(document.createTextNode("Close"));
+          layerCloseButton.onclick = function(){
+            console.log("layerDialog Close clicked");
+            layerDialog.close();
+          };
+          layerDialog.appendChild(layerCloseButton);
+        }
+
+        // ------------------------------------------------------------
+        // Crosshair to show the map center
 
         var crosshairShape = {coords:[0,0,0,0],type:'rect'};
         centerMarker = new google.maps.Marker({
@@ -438,6 +498,13 @@
         var laserControl = new LaserControl(laserControlDiv, map);
         laserControlDiv.index = 3;
         map.controls[google.maps.ControlPosition.BOTTOM_CENTER].push(laserControlDiv);             
+
+        if (supportHTML5Dialog) {
+          var layerControlDiv = document.createElement('div');
+          var layerControl = new LayerControl(layerControlDiv, map);
+          layerControlDiv.index = 4;
+          map.controls[google.maps.ControlPosition.LEFT_CENTER].push(layerControlDiv); 
+        }
 
         // ------------------------------------------------------------
         // Geolocation error
