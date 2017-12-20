@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>map 0.23</title>
+    <title>map 0.24</title>
     <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
     <meta charset="utf-8">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.4.4/proj4-src.js"></script>    
@@ -34,8 +34,10 @@
       var showLynx = false;
       var layerLynx = null;
       var showJarmo = false;
+      var showPlanetskier = false;
       var showMuinaisjaannokset = false;
       var layerJarmo = null;
+      var layerPlanetskier = null;
       var path = [];
       var centerMarker;
       var start_location = current_location;
@@ -69,7 +71,7 @@
       function saveState() {
         var map_center = map.getCenter();
         console.log("saveState:lat="+map_center.lat()+",lng="+map_center.lng()+',Zoom='+map.getZoom()+'MapTypeId='+map.getMapTypeId()
-                     +'showLynx='+showLynx+'showJarmo='+showJarmo+'showMuinaisjaannokset='+showMuinaisjaannokset);
+                     +'showLynx='+showLynx+'showJarmo='+showJarmo+'showMuinaisjaannokset='+showMuinaisjaannokset+'showPlanetskier='+showPlanetskier);
         sessionStorage.setItem('Lat', String(map_center.lat()));
         sessionStorage.setItem('Lng', String(map_center.lng()));
         sessionStorage.setItem('Zoom', String(map.getZoom()));
@@ -78,6 +80,7 @@
         saveBool('AutoMove', autoMove);          
         saveBool('ShowLynx', showLynx);          
         saveBool('ShowJarmo', showJarmo);
+        saveBool('ShowPlanetskier', showPlanetskier);
         saveBool('ShowMuinaisjaannokset', showMuinaisjaannokset);
       }
 
@@ -137,6 +140,13 @@
         } else {
           console.log("restoreState:could not restore ShowJarmo");
         }
+        if (sessionStorage.getItem('ShowPlanetskier')) {
+          handleLynxLayer(restoreBool('ShowPlanetskier'));
+          console.log("restoreState:showPlanetskier="+showPlanetskier);
+        } else {
+          console.log("restoreState:could not restore ShowPlanetskier");
+        }
+        
         if (sessionStorage.getItem('ShowMuinaisjaannokset')) {
           handleLynxLayer(restoreBool('ShowMuinaisjaannokset'));
           console.log("restoreState:showMuinaisjaannokset="+showMuinaisjaannokset);
@@ -260,7 +270,7 @@
       }
 
       // ------------------------------------------------------------
-      // load Lynx and Jarmo layers
+      // load Lynx, Jarmo and Planetskier layers
 
       function loadLynxLayer() {
         if (!layerLynx) {
@@ -281,6 +291,17 @@
           });
         }
       }
+
+      function loadPlanetskierLayer() {
+        if (!layerPlanetskier) {
+          console.log("loadPlanerskierLayer:create new layer");
+          layerPlanetskier = new google.maps.KmlLayer('https://planetskier.net/locations.kmz', {
+              preserveViewport: true,
+              suppressInfoWindows: false 
+          });
+        }
+      }
+
 
       function loadMuinaisjaannoksetLayer() {
         if (!layerMuinaisjaannokset) {
@@ -338,6 +359,28 @@
             }
         }
       }
+
+      function handlePlanetskierLayer(showLayer) {
+        if (showLayer == showPlanetskier) {
+          // no change
+          console.log("handlePlanetskierLayer:no change, showPlanetskier=", showPlanetskier);
+          return;
+        }
+        showPlanetskier = showLayer;
+        if (showLayer) {
+            console.log("handlePlanetskierLayer:show Planetskier layer, showPlanetskier=", showPlanetskier);
+            loadPlanetskierLayer();
+            if (map) {
+              layerPlanetskier.setMap(map);
+            }
+        } else {
+          console.log("handlePlanetskierLayer:hide Planetskier layer, showPlanetskier=", showPlanetskier);
+          if (map) {
+              layerPlanetskier.setMap(null);
+            }
+        }
+      }
+
 
       function handleMuinaisjaannoksetLayer(showLayer) {
         if (showLayer == showMuinaisjaannokset) {
@@ -404,12 +447,18 @@
           option.text = "Muin.j.";
           categoryDropDown.add(option, 3);          
 
+          option = document.createElement("option");
+          option.text = "Planetski";
+          categoryDropDown.add(option, 4);
+
           if (showLynx) {
             categoryDropDown.selectedIndex = 1;
           } else if (showJarmo) {
             categoryDropDown.selectedIndex = 2;
           } else if (showMuinaisjaannokset) {
             categoryDropDown.selectedIndex = 3;            
+          } else if (showPlanetskier) {
+            categoryDropDown.selectedIndex = 4;
           } else {
             categoryDropDown.selectedIndex = 0;
           }
@@ -421,6 +470,7 @@
             handleLynxLayer(false);
             handleJarmoLayer(false);
             handleMuinaisjaannoksetLayer(false);
+            handlePlanetskier(false);
             if (selIndex == 1) {
               // Lynx
               handleLynxLayer(true);
@@ -428,8 +478,12 @@
               // Jarmo
               handleJarmoLayer(true); 
             } else if (selIndex == 3) {
-              // Jarmo
-              handleMuinaisjaannoksetLayer(true);                         
+              // Muinaisjäännökset
+              handleMuinaisjaannoksetLayer(true);
+            } else if (selIndex == 4) {
+              // Muinaisjäännökset
+              handlePlanetskier(true);                         
+              
             }
           });
 
@@ -483,6 +537,20 @@
           layerDialog.appendChild(checkBox);
           document.body.appendChild(layerDialog);
           layerDialog.appendChild(document.createElement("BR"));
+
+          // Planetskier checkbox
+          layerDialog.appendChild(document.createTextNode("Planetskier layer"));
+          checkBox = document.createElement("INPUT");
+          checkBox.setAttribute("type", "checkbox");
+          checkBox.value = 'Planetskier';
+          checkBox.checked = showPlanetskier;
+          checkBox.onclick = function(){
+            console.log("layerDialog Planetskier clicked, value=", this.checked);
+            handlePlanetskierLayer(this.checked);
+          };
+          layerDialog.appendChild(checkBox);
+          document.body.appendChild(layerDialog);
+          layerDialog.appendChild(document.createElement("BR"));          
 
           // Close button
           var layerCloseButton = document.createElement("BUTTON");
