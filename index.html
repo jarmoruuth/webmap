@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>map 0.24</title>
+    <title>map 0.25</title>
     <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
     <meta charset="utf-8">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.4.4/proj4-src.js"></script>    
@@ -174,120 +174,6 @@
       }
 
       // ------------------------------------------------------------
-      // Custom control button defintion
-
-      function textButton(controlDiv, text, title) {
-        // Custom control to center the
-        // Set CSS for the control border.
-        var controlUI = document.createElement('div');
-        controlUI.style.backgroundColor = '#fff';
-        controlUI.style.border = '2px solid #fff';
-        controlUI.style.borderRadius = '3px';
-        controlUI.style.boxShadow = '0 2px 6px rgba(0,0,0,.3)';
-        controlUI.style.cursor = 'pointer';
-        controlUI.style.marginBottom = '22px';
-        controlUI.style.textAlign = 'center';
-        controlUI.title = title;
-        controlDiv.appendChild(controlUI);
-
-        // Set CSS for the control interior.
-        var controlText = document.createElement('div');
-        controlText.style.color = 'rgb(25,25,25)';
-        controlText.style.fontFamily = 'Roboto,Arial,sans-serif';
-        controlText.style.fontSize = '12px';
-        controlText.style.lineHeight = '26px';
-        controlText.style.paddingLeft = '5px';
-        controlText.style.paddingRight = '5px';
-        controlText.innerHTML = text;
-        controlUI.appendChild(controlText);
-
-        return controlUI;
-      }
-
-      // ------------------------------------------------------------
-      // Custom control to center the map
-        
-      function CenterControl(controlDiv, map) {
-
-        var controlUI = textButton(controlDiv, 'GPS', 'Click to recenter the map');
-
-        // Setup the click event listeners: center to current position
-        controlUI.addEventListener('click', function() {
-          map.panTo(current_location);
-          autoMove = true;
-          centerMarker.setVisible(!autoMove);
-          console.log("click Center Map:autoMove=true");
-        });        
-      }
-
-      // ------------------------------------------------------------
-      // Link to 1956 aerial images
-
-      function Aerial1956Control(controlDiv, map) {
-
-        var controlUI = textButton(controlDiv, '1956', 'Click to go to 1956 aerial map');
-
-        // Setup the click event listeners: aerial images from 1956
-        controlUI.addEventListener('click', function() {
-          // save current state in case we return back
-          saveState();          
-          // ETRS-GK25 (EPSG:3879)
-          var p = "+proj=tmerc +lat_0=0 +lon_0=25 +k=1 +x_0=25500000 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs";
-          proj4.defs("ETRS-GK25", p);
-          var map_center = map.getCenter();
-          // convert map coordinates to ETRS-GK25 (EPSG:3879) that is used for aerial photos
-          var coord = proj4('ETRS-GK25', [map_center.lng(), map_center.lat()]);
-          var link = "https://kirkkonummi.karttatiimi.fi/?setlanguage=fi&e="+coord[0]+"&n="+coord[1]+"&r=1&w=&l=1956ortoilmakuva&o=100"+
-                     "&geom=POINT("+coord[0]+"%20"+coord[1]+")";
-          console.log("click 1956: jump to page " + link);
-          //alert('jump to 1956');
-          window.location.href = link;
-        });        
-      }
-
-      // ------------------------------------------------------------
-      // Layer button to open dialog, only if HTML5 dialog is supported
-
-      if (supportHTML5Dialog) {
-        function LayerControl(controlDiv, map) {
-
-          var controlUI = textButton(controlDiv, 'Layers', 'Click to select layers');
-
-          // Setup the click event listeners: layer dialog
-          controlUI.addEventListener('click', function() {
-            console.log("click Layer, layerDialog.showModal()");
-            layerDialog.showModal();
-          });        
-        }
-      }
-
-      // ------------------------------------------------------------
-      // Link to laser images
-
-      function LaserControl(controlDiv, map) {
-
-        var controlUI = textButton(controlDiv, 'MML Laser', 'Click to select MML laser scan maps');
-
-        // Setup the click event listeners: MML laser images
-        controlUI.addEventListener('click', function() {
-          // save current state in case we return back
-          saveState();          
-          // ETRS-TM35FIN (EPSG:3067)
-          var p = "+proj=utm +zone=35 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs";
-          proj4.defs("ETRS-TM35FIN", p);
-          var map_center = map.getCenter();
-          // convert map coordinates to ETRS-TM35FIN (EPSG:3067) that is used for maanmittauslaitos maps
-          var coord = proj4('ETRS-TM35FIN', [map_center.lng(), map_center.lat()]);
-          var link = "https://asiointi.maanmittauslaitos.fi/karttapaikka/?share=customMarker&"+
-                     "n="+coord[1]+"&e="+coord[0]+
-                     "&desc=&zoom=10&layers=%5B%7B%22id%22%3A186%2C%22opacity%22%3A50%7D%5D";
-          console.log("click Laser: jump to page " + link);
-          //alert('jump to MML');
-          window.location.href = link;
-        });        
-      }
-
-      // ------------------------------------------------------------
       // load layer
 
       function loadLayer(layer) {
@@ -398,11 +284,11 @@
             }
           });
 
-          map.controls[google.maps.ControlPosition.LEFT_CENTER].push(categoryDropDown);
+          map.controls[google.maps.ControlPosition.BOTTOM_LEFT].push(categoryDropDown);
         }
 
         // ------------------------------------------------------------
-        // Dialog  menu to chhose layers, with dialog menu multiple
+        // Dialog  menu to chose layers, with dialog menu multiple
         // layers can be visible at the same time
 
         if (supportHTML5Dialog) {
@@ -414,7 +300,6 @@
 
           // Create check box for all layers
           for (var i = 0; i < layers.length; i++) {
-            layerDialog.appendChild(document.createTextNode(layers[i].name));
             checkBox = document.createElement("INPUT");
             checkBox.setAttribute("type", "checkbox");
             checkBox.value = layers[i].name;
@@ -428,6 +313,7 @@
               }
             };
             layerDialog.appendChild(checkBox);
+            layerDialog.appendChild(document.createTextNode(layers[i].name));
             layerDialog.appendChild(document.createElement("BR"));            
           }
 
@@ -493,28 +379,82 @@
         infoWindow = new google.maps.InfoWindow;
 
         // ----------------------------------------------------------
-        // Create the DIV to hold the control and call the CenterControl()
-        // constructor passing in this DIV.
-        var centerControlDiv = document.createElement('div');
-        var centerControl = new CenterControl(centerControlDiv, map);
-        centerControlDiv.index = 1;
-        map.controls[google.maps.ControlPosition.RIGHT_CENTER].push(centerControlDiv);
+        // GPS icon to center the map
 
-        var aerial1956ControlDiv = document.createElement('div');
-        var aerial1956Control = new Aerial1956Control(aerial1956ControlDiv, map);
-        aerial1956ControlDiv.index = 2;
-        map.controls[google.maps.ControlPosition.BOTTOM_LEFT].push(aerial1956ControlDiv);
+        var gpsDiv = document.createElement('div');
+        var gpsButton = document.createElement("IMG");
+        gpsButton.src = 'https://ruuth.xyz/ic_gps_fixed_black_24px.svg';
+        gpsButton.addEventListener('click', function() {
+          map.panTo(current_location);
+          autoMove = true;
+          centerMarker.setVisible(!autoMove);
+          console.log("click Center Map:autoMove=true");
+        });
+        gpsDiv.appendChild(gpsButton);
+        map.controls[google.maps.ControlPosition.RIGHT_CENTER].push(gpsDiv);
 
-        var laserControlDiv = document.createElement('div');
-        var laserControl = new LaserControl(laserControlDiv, map);
-        laserControlDiv.index = 3;
-        map.controls[google.maps.ControlPosition.BOTTOM_CENTER].push(laserControlDiv);             
+        // ----------------------------------------------------------
+        // Buttons for extarnal maps: 
+        //  1956 - Kirkkonummi aerial images from 1956
+        //  MML Laser - Maanmittauslaitos laser scan for surface structures
+
+        var externalMapsDiv = document.createElement('div');
+        var button1956 = document.createElement("BUTTON");
+        var button1956Text = document.createTextNode("1956");
+        button1956.appendChild(button1956Text);
+        button1956.addEventListener('click', function() {
+          // save current state in case we return back
+          saveState();          
+          // ETRS-GK25 (EPSG:3879)
+          var p = "+proj=tmerc +lat_0=0 +lon_0=25 +k=1 +x_0=25500000 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs";
+          proj4.defs("ETRS-GK25", p);
+          var map_center = map.getCenter();
+          // convert map coordinates to ETRS-GK25 (EPSG:3879) that is used for aerial photos
+          var coord = proj4('ETRS-GK25', [map_center.lng(), map_center.lat()]);
+          var link = "https://kirkkonummi.karttatiimi.fi/?setlanguage=fi&e="+coord[0]+"&n="+coord[1]+"&r=1&w=&l=1956ortoilmakuva&o=100"+
+                     "&geom=POINT("+coord[0]+"%20"+coord[1]+")";
+          console.log("click 1956: jump to page " + link);
+          //alert('jump to 1956');
+          window.location.href = link;
+        });
+        externalMapsDiv.appendChild(button1956);
+
+        var buttonLaser = document.createElement("BUTTON");
+        var buttonLaserText = document.createTextNode("MML Laser");
+        buttonLaser.appendChild(buttonLaserText);
+        buttonLaser.addEventListener('click', function() {
+          // save current state in case we return back
+          saveState();          
+          // ETRS-TM35FIN (EPSG:3067)
+          var p = "+proj=utm +zone=35 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs";
+          proj4.defs("ETRS-TM35FIN", p);
+          var map_center = map.getCenter();
+          // convert map coordinates to ETRS-TM35FIN (EPSG:3067) that is used for maanmittauslaitos maps
+          var coord = proj4('ETRS-TM35FIN', [map_center.lng(), map_center.lat()]);
+          var link = "https://asiointi.maanmittauslaitos.fi/karttapaikka/?share=customMarker&"+
+                     "n="+coord[1]+"&e="+coord[0]+
+                     "&desc=&zoom=10&layers=%5B%7B%22id%22%3A186%2C%22opacity%22%3A50%7D%5D";
+          console.log("click Laser: jump to page " + link);
+          //alert('jump to MML');
+          window.location.href = link;
+        });             
+        externalMapsDiv.appendChild(buttonLaser);
+
+        map.controls[google.maps.ControlPosition.BOTTOM_CENTER].push(externalMapsDiv);
+
+        // ----------------------------------------------------------
+        // HTML5 dialog for layers
 
         if (supportHTML5Dialog) {
-          var layerControlDiv = document.createElement('div');
-          var layerControl = new LayerControl(layerControlDiv, map);
-          layerControlDiv.index = 4;
-          map.controls[google.maps.ControlPosition.LEFT_CENTER].push(layerControlDiv); 
+          var layersDiv = document.createElement('div');
+          var layersButton = document.createElement("IMG");
+          layersButton.src = 'https://ruuth.xyz/ic_layers_black_24px.svg';
+          layersButton.addEventListener('click', function() {
+            console.log("click Layer, layerDialog.showModal()");
+            layerDialog.showModal();
+          });
+          layersDiv.appendChild(layersButton);
+          map.controls[google.maps.ControlPosition.LEFT_CENTER].push(layersDiv);
         }
 
         // ------------------------------------------------------------
