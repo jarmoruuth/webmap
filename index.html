@@ -284,6 +284,8 @@
             }
           });
 
+          categoryDropDown.style.marginBottom = '22px';
+
           map.controls[google.maps.ControlPosition.BOTTOM_LEFT].push(categoryDropDown);
         }
 
@@ -378,6 +380,13 @@
         marker = null;
         infoWindow = new google.maps.InfoWindow;
 
+        function setDivStyle(div) {
+          div.style.backgroundColor = '#fff';
+          div.style.border = '2px solid #fff';
+          div.style.borderRadius = '3px';
+          div.style.boxShadow = '0 2px 6px rgba(0,0,0,.3)';
+        }
+
         // ----------------------------------------------------------
         // GPS icon to center the map
 
@@ -390,6 +399,8 @@
           centerMarker.setVisible(!autoMove);
           console.log("click Center Map:autoMove=true");
         });
+        setDivStyle(gpsDiv);
+        gpsDiv.style.marginRight = '11px';
         gpsDiv.appendChild(gpsButton);
         map.controls[google.maps.ControlPosition.RIGHT_CENTER].push(gpsDiv);
 
@@ -437,8 +448,9 @@
           console.log("click Laser: jump to page " + link);
           //alert('jump to MML');
           window.location.href = link;
-        });             
+        }); 
         externalMapsDiv.appendChild(buttonLaser);
+        externalMapsDiv.style.marginBottom = '22px';
 
         map.controls[google.maps.ControlPosition.BOTTOM_CENTER].push(externalMapsDiv);
 
@@ -453,6 +465,8 @@
             console.log("click Layer, layerDialog.showModal()");
             layerDialog.showModal();
           });
+          setDivStyle(layersDiv);
+          layersDiv.style.marginLeft = '11px';
           layersDiv.appendChild(layersButton);
           map.controls[google.maps.ControlPosition.LEFT_CENTER].push(layersDiv);
         }
