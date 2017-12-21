@@ -71,6 +71,36 @@
 
       console.log('*** body ***');
 
+      var url = new URL(window.location);
+      console.log(url);
+      var searchParams = new URLSearchParams(url.search.slice(1));
+      var klmparams = searchParams.getAll('klm');
+      for (var i = 0; i < klmparams.length; i++) {
+        var klm = klmparams[i];
+        console.log('klm param{'+i+'='+klm);
+        var newlayer = {};
+        var newvalues = klm.split(',');
+        console.log('newvalues=', newvalues);
+        console.log('newvalues[0]=', newvalues[0]);
+        console.log('newvalues[1]=', newvalues[1]);
+        if (newvalues[0] && newvalues[1]) {
+          console.log('add new klm layer, newvalues=', newvalues);
+          newlayer.type = 'klm';
+          newlayer.url = newvalues[0];
+          newlayer.name = newvalues[1];
+          if (newvalues[2]) {
+            newlayer.shortname = newvalues[2];
+          } else {
+            newlayer.shortname = newlayer.name.substring(0, 7);
+          }
+          newlayer.visible = false;
+          newlayer.layer = null;
+          layers[layers.length] = newlayer;
+        } else {
+          console.log('new klm layer needs url and name, newvalues=', newvalues);            
+        }
+      }
+
       if (typeof HTMLDialogElement === 'function') {
         supportHTML5Dialog = true;
       } else {
