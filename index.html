@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>map 0.25</title>
+    <title>map 0.26</title>
     <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
     <meta charset="utf-8">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.4.4/proj4-src.js"></script>    
@@ -31,7 +31,10 @@
       var current_location = {lat: 60.2053791, lng: 24.6540694};          // Espoo
       //var current_location = {lat: 60.124932, lng: 24.439290};    // Kirkkonummi
       var autoMove = true;
-      var path = [];
+      var path = [];                // path of last positions
+      var maxpath = 10;             // max path points to save
+      var pathinterval = 10000;     // interval for storing path points
+      var recording_distance = 10;  // distance between points before we record a new one
       var centerMarker;
       var start_location = current_location;
       var start_zoom = 15;
@@ -71,18 +74,22 @@
 
       console.log('*** body ***');
 
+      // check parameters from url
+      //
       var url = new URL(window.location);
       console.log(url);
       var searchParams = new URLSearchParams(url.search.slice(1));
+
+      // check klm parameters for a new layers
+      // klm=<url>,<name>[,<shortname>]
+      //
       var klmparams = searchParams.getAll('klm');
       for (var i = 0; i < klmparams.length; i++) {
         var klm = klmparams[i];
-        console.log('klm param{'+i+'='+klm);
+        console.log('klm param['+i+']='+klm);
         var newlayer = {};
         var newvalues = klm.split(',');
         console.log('newvalues=', newvalues);
-        console.log('newvalues[0]=', newvalues[0]);
-        console.log('newvalues[1]=', newvalues[1]);
         if (newvalues[0] && newvalues[1]) {
           console.log('add new klm layer, newvalues=', newvalues);
           newlayer.type = 'klm';
@@ -101,6 +108,58 @@
         }
       }
 
+      // check fusion table parameters for a new layers
+      // fusion=<column>,<table<>,<name>[,<shortname>]
+      //
+      var klmparams = searchParams.getAll('fusion');
+      for (var i = 0; i < klmparams.length; i++) {
+        var fusion = fusionparams[i];
+        console.log('fusion param['+i+']='+fusion);
+        var newlayer = {};
+        var newvalues = fusion.split(',');
+        console.log('newvalues=', newvalues);
+        if (newvalues[0] && newvalues[1]) {
+          console.log('add new fusion layer, newvalues=', newvalues);
+          newlayer.type = 'fusion';
+          newlayer.col = newvalues[0];
+          newlayer.tab = newvalues[1];
+          newlayer.name = newvalues[2];
+          if (newvalues[3]) {
+            newlayer.shortname = newvalues[3];
+          } else {
+            newlayer.shortname = newlayer.name.substring(0, 7);
+          }
+          newlayer.visible = false;
+          newlayer.layer = null;
+          layers[layers.length] = newlayer;
+        } else {
+          console.log('new fusion layer needs column, table and name, newvalues=', newvalues);
+        }
+      }
+
+      // check path parameters
+      // path=<max path points>[,<interval in seconds>[,<recording distance in meters>]]
+      // path=0 disables path printing
+      //
+      var pathparams = searchParams.get('path');
+      if (pathparams) {
+        var newvalues = pathparams.split(',');
+        if (newvalues[0]) {
+          maxpath = Number(newvalues[0]);
+          console.log('new maxpath='+maxpath);
+        }
+        if (newvalues[1]) {
+          pathinterval = Number(newvalues[1]) * 1000;
+          console.log('pathinterval='+pathinterval);
+        }
+        if (newvalues[2]) {
+          recording_distance = Number(newvalues[2]);
+          console.log('recording_distance='+recording_distance);
+        }
+      }
+
+      // check if HTML5 dialog is supported. If not we use full down menu for layers
+      //
       if (typeof HTMLDialogElement === 'function') {
         supportHTML5Dialog = true;
       } else {
@@ -138,6 +197,16 @@
         }
         console.log(visible_layers);
         sessionStorage.setItem('VisibleLayers', visible_layers);
+        if (path.length > 0) {
+          var save_path = '';
+          for (var i = 0; i < path.length; i++) {
+            var pos = path[i].getCenter();
+            var posJSON = pos.toJSON();
+            save_path = save_path + JSON.stringify(posJSON) + ' ';
+          }
+          //alert(save_path);
+          sessionStorage.setItem('Path', save_path);
+        }
       }
 
       // ------------------------------------------------------------
@@ -201,7 +270,23 @@
         } else {
           console.log('restoreState:could not restore VisibleLayers');
         }
-      }
+        if (!atStart) {
+          if (sessionStorage.getItem('Path')) {
+            var saved_path = sessionStorage.getItem('Path').split(' ');
+            console.log(saved_path);
+            for (var i = 0; i < saved_path.length && saved_path[i].length > 5; i++) {
+              console.log('saved_path['+i+']='+saved_path[i]);
+              var json = JSON.parse(saved_path[i]);
+              path[path.length] = pathCircle({
+                                      lat: json['lat'],
+                                      lng: json['lng']
+                                    });
+            }
+          } else {
+            console.log('restoreState:could not restore Path');
+          }
+        }
+      }        
 
       // ------------------------------------------------------------
       // load layer
@@ -616,46 +701,52 @@
       });
 
       // ------------------------------------------------------------
+      // Function to create a circle for the path
+
+      function pathCircle(loc) {
+        var new_circle = new google.maps.Circle({
+                                  strokeColor: '#FF0000',
+                                  strokeOpacity: 0.8,
+                                  strokeWeight: 2,
+                                  fillColor: '#FF0000',
+                                  fillOpacity: 0.35,
+                                  map: map,
+                                  center: loc,
+                                  radius: 5,
+                                  clickable : false
+                                });
+          return(new_circle);
+      }
+
+      // ------------------------------------------------------------
       // function to be called periodically to show path
-      setInterval(function() {
-        var new_pos;
-        var distance;
-        if (path.length > 0) {
-          // check that we have moved enough to add a new marker
-          distance = google.maps.geometry.spherical.computeDistanceBetween(
-                      new google.maps.LatLng(current_location),
-                      path[path.length-1].getCenter());
-          if (distance < 10) {
-            console.log('Do not add new element, too short distance='+distance+',path.length='+path.length);
-            return;
+
+      if (maxpath > 0) {
+        setInterval(function() {
+          if (path.length > 0 && map) {
+            // check that we have moved enough to add a new marker
+            var distance = google.maps.geometry.spherical.computeDistanceBetween(
+                        new google.maps.LatLng(current_location),
+                        path[0].getCenter());
+            if (distance < recording_distance) {
+              // we record new point only if we have moved enough
+              console.log('Do not add new element, too short distance='+distance+',path.length='+path.length);
+              return;
+            }
+          }        
+          while (path.length > maxpath) {
+            // hide old element
+            path[path.length - 1].setMap(null);
+            // remove from path
+            path.pop();
           }
-        }        
-        if (path.length >= 10) {
-          // Hide oldest element
-          console.log('Hide oldest path element, path.length='+path.length+',distance='+distance);
-          path[0].setMap(null);
-          // Make room for a new element at the end
-          for (var i = 1; i < path.length; i++) {
-            path[i-1] = path[i];
-          }
-          new_pos = 9;
-        } else {
-          console.log('Add new path element, path.length='+path.length+',distance='+distance);
-          new_pos = path.length;
-        }
-        // Add new circle to the map.
-        path[new_pos] = new google.maps.Circle({
-                              strokeColor: '#FF0000',
-                              strokeOpacity: 0.8,
-                              strokeWeight: 2,
-                              fillColor: '#FF0000',
-                              fillOpacity: 0.35,
-                              map: map,
-                              center: current_location,
-                              radius: 5,
-                              clickable : false
-                            });
-      }, 10000);
+
+          // Add new circle to the map.
+          var new_circle = pathCircle(current_location);
+          // add as the first element in path
+          path.unshift(new_circle);
+        }, pathinterval);
+      }
 
     </script>
     <script async defer
