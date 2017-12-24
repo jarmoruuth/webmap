@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>map 0.26</title>
+    <title>map 0.27</title>
     <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
     <meta charset="utf-8">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.4.4/proj4-src.js"></script>    
@@ -45,7 +45,7 @@
                       { name : 'Lynx', 
                         shortname : 'Lynx',
                         visible : false, 
-                        type : 'klm', 
+                        type : 'kml', 
                         url : 'https://ruuth.xyz/Lynx.kmz', 
                         layer : null 
                       },
@@ -60,15 +60,15 @@
                       { name : 'Planetskier', 
                         shortname : 'Planetski',
                         visible : false, 
-                        type : 'klm', 
+                        type : 'kml', 
                         url : 'https://planetskier.net/locations.kmz', 
                         layer : null 
                       },
                       { name : 'Jarmo', 
                         shortname : 'Jarmo',
                         visible : false, 
-                        type : 'klm', 
-                        url : 'https://ruuth.xyz/EspoonLahiretkia.kmz', 
+                        type : 'kml', 
+                        url : 'https://ruuth.xyz/EspoonLahiretkia.kml', 
                         layer : null }
                    ];
 
@@ -80,19 +80,19 @@
       console.log(url);
       var searchParams = new URLSearchParams(url.search.slice(1));
 
-      // check klm parameters for a new layers
-      // klm=<url>,<name>[,<shortname>]
+      // check kml parameters for a new layers
+      // kml=<url>,<name>[,<shortname>]
       //
-      var klmparams = searchParams.getAll('klm');
-      for (var i = 0; i < klmparams.length; i++) {
-        var klm = klmparams[i];
-        console.log('klm param['+i+']='+klm);
+      var kmlparams = searchParams.getAll('kml');
+      for (var i = 0; i < kmlparams.length; i++) {
+        var kml = kmlparams[i];
+        console.log('kml param['+i+']='+kml);
         var newlayer = {};
-        var newvalues = klm.split(',');
+        var newvalues = kml.split(',');
         console.log('newvalues=', newvalues);
         if (newvalues[0] && newvalues[1]) {
-          console.log('add new klm layer, newvalues=', newvalues);
-          newlayer.type = 'klm';
+          console.log('add new kml layer, newvalues=', newvalues);
+          newlayer.type = 'kml';
           newlayer.url = newvalues[0];
           newlayer.name = newvalues[1];
           if (newvalues[2]) {
@@ -104,15 +104,15 @@
           newlayer.layer = null;
           layers[layers.length] = newlayer;
         } else {
-          console.log('new klm layer needs url and name, newvalues=', newvalues);            
+          console.log('new kml layer needs url and name, newvalues=', newvalues);            
         }
       }
 
       // check fusion table parameters for a new layers
       // fusion=<column>,<table<>,<name>[,<shortname>]
       //
-      var klmparams = searchParams.getAll('fusion');
-      for (var i = 0; i < klmparams.length; i++) {
+      var kmlparams = searchParams.getAll('fusion');
+      for (var i = 0; i < kmlparams.length; i++) {
         var fusion = fusionparams[i];
         console.log('fusion param['+i+']='+fusion);
         var newlayer = {};
@@ -293,11 +293,11 @@
 
       function loadLayer(layer) {
         if (!layer.layer) {
-          if (layer.type == 'klm') {
-            console.log("loadLayer:create new klm layer, layer=", layer.name);            
+          if (layer.type == 'kml') {
+            console.log("loadLayer:create new kml layer, layer=", layer.name);            
             layer.layer = new google.maps.KmlLayer(layer.url, {
                 preserveViewport: true,
-                suppressInfoWindows: false 
+                suppressInfoWindows: false
             });
           } else if (layer.type == 'fusion') {
             console.log("loadLayer:create new fusion layer, layer=", layer.name);            

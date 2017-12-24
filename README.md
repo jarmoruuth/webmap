@@ -15,7 +15,7 @@ Both external services use a different coordinate system than Google maps. Kirkk
 
 There are are some other layers than Lynx available for personal interest. Layers are selected by layers button if HTML5 dialog is supported in browser. Chrome supports dialog but not many others do. From dialog it is possible to choose multiple layers. If dialog is not supported then single a layer can be chosen from a pull down menu. 
 
-It is possible to add layers by giving them in the url. Klm layers can be added using syntax "klm=<url>,<name>[,<shortname>]". Fusion layers can be added using syntax "fusion=<column>,<table<>,<name>[,<shortname>]". For example https://test.net/map.html?klm=http://info.net/points.kmz,MyPoints adds a new layer that show points from points.kmz.
+It is possible to add layers by giving them in the url. Kml layers can be added using syntax "kml=<url>,<name>[,<shortname>]". Fusion layers can be added using syntax "fusion=<column>,<table<>,<name>[,<shortname>]". For example https://test.net/map.html?kml=http://info.net/points.kmz,MyPoints adds a new layer that show points from points.kmz.
 
 The map page keeps track of last 10 old positions. Those are marked as red dots on the map. A new dot is recorded every 10 seconds if it is further than 10 meters from the last dot recorded. I hope that this is useful to see the direction where you are heading when walking in a forest. Position tracking is configurable through url. Syntax for the setting is "path=<max path points>[,<interval in seconds>[,<recording distance in meters>]]", for example https://test.net/map.html?path=1000,60,5 keeps 1000 last points and they are recorded once a minute if locations is changed 5 meters or more. Setting path=0 disables tracking of old positions. 
 
@@ -24,4 +24,4 @@ The current map state is stored into HTML5 session storage while jumping between
 Using HTML5 geolocation API on mobile devices like Chrome on Android requires that page is loaded from https source. There are many alternatives to create a web server that support https. I used Caddy and it was very easy to get started.
 
 Example of multiple configuration parameters from url: 
-https://test.net/map.html?klm=http://info.net/points.kmz,MyPoints&path=1000&klm=http://info.net/points2.kmz,MyPoints2
+https://test.net/map.html?kml=http://info.net/points.kmz,MyPoints&path=1000&kml=http://info.net/points2.kmz,MyPoints2
