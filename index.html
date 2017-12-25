@@ -37,6 +37,7 @@
       var recording_distance = 10;  // distance between points before we record a new one
       var circle_radius = 5;
       var centerMarker;
+      var url_markers = [];
       var start_location = current_location;
       var map_zoom = 15;
       var start_maptypeid;
@@ -112,8 +113,8 @@
       // check fusion table parameters for a new layers
       // fusion=<column>,<table<>,<name>[,<shortname>]
       //
-      var kmlparams = searchParams.getAll('fusion');
-      for (var i = 0; i < kmlparams.length; i++) {
+      var fusionparams = searchParams.getAll('fusion');
+      for (var i = 0; i < fusionparams.length; i++) {
         var fusion = fusionparams[i];
         console.log('fusion param['+i+']='+fusion);
         var newlayer = {};
@@ -156,6 +157,62 @@
         if (newvalues[2]) {
           recording_distance = Number(newvalues[2]);
           console.log('recording_distance='+recording_distance);
+        }
+      }
+
+      // check map center from url
+      var centerparams = searchParams.get('center');
+      if (centerparams) {
+        console.log('centerparams='+centerparams);
+        var newvalues = centerparams.split(',');
+        var urlPos = {
+              lat: Number(newvalues[0]),
+              lng: Number(newvalues[1])
+        };
+        var urlMarker = {
+              pos : urlPos,
+              label : newvalues[2] ? newvalues[2] : 'C'
+        };
+        url_markers[url_markers.length] = urlMarker;
+        if (!sessionStorage.getItem('Lat')) {
+          // not saved center, get from url
+          start_location = urlPos;
+          autoMove = false;
+        }
+      }
+
+      // check markers from url
+      var markerparams = searchParams.getAll('marker');
+      for (var i = 0; i < markerparams.length; i++)  {
+        console.log('markerparams='+markerparams[i]);
+        var params = markerparams[i];
+        var newvalues = params.split(',');
+        var urlPos = {
+              lat: Number(newvalues[0]),
+              lng: Number(newvalues[1])
+        };
+        var urlMarker = {
+              pos : urlPos,
+              label : newvalues[2] ? newvalues[2] : 'M'
+        };
+        url_markers[url_markers.length] = urlMarker;        
+      }      
+
+      // check visible layers
+      if (!sessionStorage.getItem('Lat')) {
+        // no saved data, get from url
+        var layersparams = searchParams.get('layers');
+        if (layersparams) {
+          console.log('layersparams='+layersparams);
+          var newvalues = layersparams.split(',');
+          for (var i = 0; i < newvalues.length; i++) {
+            for (var j = 0; j < layers.length; j++) {
+              if (layers[j].name == newvalues[i])  {
+                console.log('set visible, layer='+layers[j].name);
+                layers[j].visible = true;
+              }
+            }
+          }
         }
       }
 
@@ -263,9 +320,6 @@
               for (var j = 0; j < layers.length; j++) {
                 if (visible_layers[i] == layers[j].name) {
                   layers[j].visible = true;
-                  if (!atStart) {
-                    showLayer(layers[j]);
-                  }
                 }
               }
           }
@@ -331,6 +385,14 @@
           }
       }
 
+      function showVisibleLayers() {
+        for (var i = 0; i < layers.length; i++) {
+          if (layers[i].visible) {
+            showLayer(layers[i]);
+          }
+        }
+      }
+
       function handleLayer(layer, show) {
         if (show == layer.visible) {
           // no change
@@ -343,6 +405,21 @@
         } else {
           hideLayer(layer);
         }
+      }
+
+      // ------------------------------------------------------------
+      // Calculate circle radious based on map zoom
+
+      function updateCircleRadius(zoom) {
+        if (zoom >= 17) {
+          circle_radius = 20 - zoom;
+          if (circle_radius < 0.5) {
+            circle_radius = 0.5;
+          }
+        } else {
+          circle_radius = 5;
+        }
+        console.log('updateCircleRadius:zoom='+zoom+',circle_radius='+circle_radius);        
       }
 
       // ------------------------------------------------------------
@@ -365,6 +442,18 @@
             ]
           }
         });
+
+        // initMap: show markers listed in url
+
+        for (var i = 0; i < url_markers.length; i++) {
+          console.log('show markes, pos='+url_markers[i].pos+',label='+url_markers[i].label);
+          var marker = new google.maps.Marker({
+            position: url_markers[i].pos,
+            map: map,
+            title: 'Url marker',
+            label: url_markers[i].label
+          });
+        }
 
         // ------------------------------------------------------------
         // initMap: DropDown menu when HTML5 dialog is not supported
@@ -624,21 +713,6 @@
         });
 
         // ------------------------------------------------------------
-        // initMap: Calculate circle radious based on map zoom
-
-        function updateCircleRadius(zoom) {
-          if (zoom >= 17) {
-            circle_radius = 20 - zoom;
-            if (circle_radius < 0.5) {
-              circle_radius = 0.5;
-            }
-          } else {
-            circle_radius = 5;
-          }
-          console.log('updateCircleRadius:zoom='+zoom+',circle_radius='+circle_radius);        
-        }
-
-        // ------------------------------------------------------------
         // initMap: Event listener for user zooming the map
         
         google.maps.event.addListener(map, 'zoom_changed', function () {
@@ -724,6 +798,7 @@
       window.addEventListener('pageshow', function(event) {
         console.log("pageshow");
         restoreState(false);
+        showVisibleLayers();
       });
 
       window.addEventListener('pagehide', function(event) {
