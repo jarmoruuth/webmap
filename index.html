@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>map 0.27</title>
+    <title>map 0.28</title>
     <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
     <meta charset="utf-8">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.4.4/proj4-src.js"></script>    
@@ -35,9 +35,10 @@
       var maxpath = 10;             // max path points to save
       var pathinterval = 10000;     // interval for storing path points
       var recording_distance = 10;  // distance between points before we record a new one
+      var circle_radius = 5;
       var centerMarker;
       var start_location = current_location;
-      var start_zoom = 15;
+      var map_zoom = 15;
       var start_maptypeid;
       var supportHTML5Dialog;
       var layerDialog;
@@ -245,12 +246,13 @@
                       ',Zoom='+sessionStorage.getItem('Zoom')+
                       ',MapTypeId='+sessionStorage.getItem('MapTypeId'));
           start_maptypeid = sessionStorage.getItem('MapTypeId');       
-          start_zoom = Number(sessionStorage.getItem('Zoom'));
+          map_zoom = Number(sessionStorage.getItem('Zoom'));
           if (map) {
             map.setMapTypeId(start_maptypeid);
-            map.setZoom(start_zoom);
+            map.setZoom(map_zoom);
             map.panTo(pos);
           }
+          updateCircleRadius(map_zoom);
         } else {
           console.log("restoreState:could not restore lat,lng,Zoom,MapTypeId");          
         }
@@ -352,7 +354,7 @@
         }
         map = new google.maps.Map(document.getElementById('map'), {
           center: start_location,
-          zoom : start_zoom,
+          zoom : map_zoom,
           mapTypeId : start_maptypeid,
           mapTypeControlOptions: {
             mapTypeIds: [
@@ -365,7 +367,7 @@
         });
 
         // ------------------------------------------------------------
-        // DropDown menu when HTML5 dialog is not supported
+        // initMap: DropDown menu when HTML5 dialog is not supported
 
         if (!supportHTML5Dialog) {
 
@@ -405,7 +407,7 @@
         }
 
         // ------------------------------------------------------------
-        // Dialog  menu to chose layers, with dialog menu multiple
+        // initMap: Dialog  menu to chose layers, with dialog menu multiple
         // layers can be visible at the same time
 
         if (supportHTML5Dialog) {
@@ -445,7 +447,7 @@
         }
 
         // ------------------------------------------------------------
-        // Crosshair to show the map center
+        // initMap: Crosshair to show the map center
 
         var crosshairShape = {coords:[0,0,0,0],type:'rect'};
         centerMarker = new google.maps.Marker({
@@ -457,7 +459,7 @@
         centerMarker.setVisible(!autoMove);
 
         // ------------------------------------------------------------
-        // Peruskartta 
+        // initMap: Peruskartta 
 
         var perusMapType = new google.maps.ImageMapType({
           getTileUrl: function(coord, zoom) {
@@ -474,7 +476,7 @@
         //map.setMapTypeId('peruskartta'); // default is roadmap
 
         // ------------------------------------------------------------
-        // Ortoilmakuvat
+        // initMap: Ortoilmakuvat
 
         var ortoMapType = new google.maps.ImageMapType({
           getTileUrl: function(coord, zoom) {
@@ -490,7 +492,7 @@
         map.mapTypes.set('ortokuvat', ortoMapType);
 
         // ------------------------------------------------------------
-        // Init some variables
+        // initMap: Init some variables
 
         marker = null;
         infoWindow = new google.maps.InfoWindow;
@@ -503,7 +505,7 @@
         }
 
         // ----------------------------------------------------------
-        // GPS icon to center the map
+        // initMap: GPS icon to center the map
 
         var gpsDiv = document.createElement('div');
         var gpsButton = document.createElement("IMG");
@@ -520,9 +522,9 @@
         map.controls[google.maps.ControlPosition.RIGHT_CENTER].push(gpsDiv);
 
         // ----------------------------------------------------------
-        // Buttons for extarnal maps: 
-        //  1956 - Kirkkonummi aerial images from 1956
-        //  MML Laser - Maanmittauslaitos laser scan for surface structures
+        // initMap: Buttons for extarnal maps: 
+        //    1956 - Kirkkonummi aerial images from 1956
+        //    MML Laser - Maanmittauslaitos laser scan for surface structures
 
         var externalMapsDiv = document.createElement('div');
         var button1956 = document.createElement("BUTTON");
@@ -570,7 +572,7 @@
         map.controls[google.maps.ControlPosition.BOTTOM_CENTER].push(externalMapsDiv);
 
         // ----------------------------------------------------------
-        // HTML5 dialog for layers
+        // initMap: HTML5 dialog for layers
 
         if (supportHTML5Dialog) {
           var layersDiv = document.createElement('div');
@@ -587,7 +589,7 @@
         }
 
         // ------------------------------------------------------------
-        // Geolocation error
+        // initMap: Geolocation error
 
         function handleLocationError(browserHasGeolocation, infoWindow, pos) {
           var msg = browserHasGeolocation ?
@@ -600,7 +602,7 @@
         }
 
         // ------------------------------------------------------------
-        // Event listener for map type change (toggle stree view)
+        // initMap: Event listener for map type change (toggle stree view)
 
         map.addListener('maptypeid_changed', function() {
           var showStreetViewControl = map.getMapTypeId() != 'peruskartta'
@@ -611,7 +613,7 @@
         });
 
         // ------------------------------------------------------------
-        // Event listener for user moving the map manually
+        // initMap: Event listener for user moving the map manually
 
         map.addListener('dragstart', function() {
             if (autoMove) {
@@ -619,6 +621,35 @@
             }
             autoMove = false;
             centerMarker.setVisible(!autoMove);
+        });
+
+        // ------------------------------------------------------------
+        // initMap: Calculate circle radious based on map zoom
+
+        function updateCircleRadius(zoom) {
+          if (zoom >= 17) {
+            circle_radius = 20 - zoom;
+            if (circle_radius < 0.5) {
+              circle_radius = 0.5;
+            }
+          } else {
+            circle_radius = 5;
+          }
+          console.log('updateCircleRadius:zoom='+zoom+',circle_radius='+circle_radius);        
+        }
+
+        // ------------------------------------------------------------
+        // initMap: Event listener for user zooming the map
+        
+        google.maps.event.addListener(map, 'zoom_changed', function () {
+          var old_radius = circle_radius;
+          updateCircleRadius(map.getZoom());
+          if (old_radius != circle_radius) {
+            console.log("zoom_changed, change circle radius");
+            for (var i = 0; i < path.length; i++) {
+              path[i].setRadius(circle_radius);
+            }
+          }
         });
 
         // ------------------------------------------------------------
@@ -644,7 +675,7 @@
           // Browser doesn't support Geolocation
           handleLocationError(false, infoWindow, map.getCenter());
         }
-      }
+      } // initMap: end
 
       // ------------------------------------------------------------
       // Update current position in the map
@@ -712,7 +743,7 @@
                                   fillOpacity: 0.35,
                                   map: map,
                                   center: loc,
-                                  radius: 5,
+                                  radius: circle_radius,
                                   clickable : false
                                 });
           return(new_circle);
