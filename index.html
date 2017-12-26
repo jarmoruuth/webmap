@@ -43,6 +43,8 @@
       var start_maptypeid;
       var supportHTML5Dialog;
       var layerDialog;
+      var settingsDialog;
+      var kmlVersion = null;
       var layers = [
                       { name : 'Lynx', 
                         shortname : 'Lynx',
@@ -246,6 +248,11 @@
         sessionStorage.setItem('Lng', String(map_center.lng()));
         sessionStorage.setItem('Zoom', String(map.getZoom()));
         sessionStorage.setItem('MapTypeId', map.getMapTypeId());
+        if (kmlVersion) {
+          sessionStorage.setItem('kmlVersion', kmlVersion);
+        } else {
+          sessionStorage.removeItem('kmlVersion');          
+        }
         console.log("saveState:autoMove="+autoMove);
         saveBool('AutoMove', autoMove);
         for (var i = 0; i < layers.length; i++) {
@@ -313,6 +320,9 @@
         } else {
           console.log("restoreState:could not restore lat,lng,Zoom,MapTypeId");          
         }
+        if (sessionStorage.getItem('kmlVersion')) {
+          kmlVersion = sessionStorage.getItem('kmlVersion');
+        }
         if (sessionStorage.getItem('VisibleLayers')) {
           var visible_layers = sessionStorage.getItem('VisibleLayers').split(' ');
           console.log(visible_layers);
@@ -350,8 +360,13 @@
       function loadLayer(layer) {
         if (!layer.layer) {
           if (layer.type == 'kml') {
-            console.log("loadLayer:create new kml layer, layer=", layer.name);            
-            layer.layer = new google.maps.KmlLayer(layer.url, {
+            console.log("loadLayer:create new kml layer, layer=", layer.name);
+            var layerUrl = layer.url;
+            if (kmlVersion) {
+              layerUrl += '?ver=' + kmlVersion;
+              console.log("loadLayer:layer url with version=", layerUrl);
+            }
+            layer.layer = new google.maps.KmlLayer(layerUrl, {
                 preserveViewport: true,
                 suppressInfoWindows: false
             });
@@ -537,6 +552,61 @@
         }
 
         // ------------------------------------------------------------
+        // initMap: Settings dialog  menu
+
+        if (supportHTML5Dialog) {
+          var checkBox;
+
+          settingsDialog = document.createElement("DIALOG");
+
+          document.body.appendChild(settingsDialog);
+
+          settingsDialog.appendChild(document.createTextNode('Center coordinates:'));
+          settingsDialog.appendChild(document.createElement("BR"));
+          var map_center = map.getCenter();      
+          settingsDialog.appendChild(document.createTextNode(String(map_center.lat()+','+String(map_center.lng()))));
+          settingsDialog.appendChild(document.createElement("BR"));
+          settingsDialog.appendChild(document.createElement("BR"));          
+
+          // Create check box for KML refresh
+          checkBox = document.createElement("INPUT");
+          checkBox.setAttribute("type", "checkbox");
+          checkBox.value = 'Force KML refresh';
+          checkBox.checked = kmlVersion != null;
+          checkBox.onclick = function() {
+            if (this.checked) {
+              var timesec = Date.now() / 1000;
+              kmlVersion = timesec.toFixed();
+              for (var i = 0; i < layers.length; i++) {
+                if (layers[i].type == 'kml') {
+                  layers[i].layer = null;
+                  if (layers[i].visible) {
+                    showLayer(layers[i]);
+                  }
+                }
+              }
+            } else {
+              kmlVersion = null;
+            }
+            console.log("settingsDialog clicked, name=" + this.value + ",checked=", this.checked+",kmlVersion="+kmlVersion);
+
+          };
+          settingsDialog.appendChild(checkBox);
+          settingsDialog.appendChild(document.createTextNode('Force KML refresh'));
+          settingsDialog.appendChild(document.createElement("BR")); 
+          settingsDialog.appendChild(document.createElement("BR"));           
+
+          // Close button
+          var settingsCloseButton = document.createElement("BUTTON");
+          settingsCloseButton.appendChild(document.createTextNode("Close"));
+          settingsCloseButton.onclick = function(){
+            console.log("settingsDialog Close clicked");
+            settingsDialog.close();
+          };
+          settingsDialog.appendChild(settingsCloseButton);
+        }
+
+        // ------------------------------------------------------------
         // initMap: Crosshair to show the map center
 
         var crosshairShape = {coords:[0,0,0,0],type:'rect'};
@@ -678,6 +748,22 @@
           map.controls[google.maps.ControlPosition.LEFT_CENTER].push(layersDiv);
         }
 
+        // ----------------------------------------------------------
+        // initMap: HTML5 dialog for settings
+
+        if (supportHTML5Dialog) {
+          var settingsDiv = document.createElement('div');
+          var settingsButton = document.createElement("IMG");
+          settingsButton.src = 'https://ruuth.xyz/ic_settings_black_24px.svg';
+          settingsButton.addEventListener('click', function() {
+            console.log("click Settings, settingsDialog.showModal()");
+            settingsDialog.showModal();
+          });
+          setDivStyle(settingsDiv);
+          settingsDiv.style.marginLeft = '11px';
+          settingsDiv.appendChild(settingsButton);
+          map.controls[google.maps.ControlPosition.LEFT_BOTTOM].push(settingsDiv);
+        }
         // ------------------------------------------------------------
         // initMap: Geolocation error
 
