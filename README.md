@@ -19,6 +19,8 @@ It is possible to add layers by giving them in the url. Kml layers can be added 
 
 The map page keeps track of last 10 old positions. Those are marked as red dots on the map. A new dot is recorded every 10 seconds if it is further than 10 meters from the last dot recorded. I hope that this is useful to see the direction where you are heading when walking in a forest. Position tracking is configurable through url. Syntax for the setting is "path=<max path points>[,<interval in seconds>[,<recording distance in meters>]]", for example https://test.net/map.html?path=1000,60,5 keeps 1000 last points and they are recorded once a minute if locations is changed 5 meters or more. Setting path=0 disables tracking of old positions. 
 
+Url can have map center position, markers and visible layers. Position where map is centered at start is given with parameter 'center=<latitude>,<longitude>[,<label>]'. Marker is given with a parameter 'marker=<latitude>,<longitude>[,<label>]'. Multiple markers can be given as separate marker parameters. Visible layers are listed with parameter 'layers=<layer name>[,<layer name>]. For example: ?center=60.152363,24.439186&layers=Lynx,Muinaisjäännökset&marker=60.152960,24.457036,1&marker=60.158981,24.45368,2
+
 The current map state is stored into HTML5 session storage while jumping between different pages. As long as the Window remains open it should remember the settings. Saved settings include current map, location, zoom, visible layers and old positions.
 
 Using HTML5 geolocation API on mobile devices like Chrome on Android requires that page is loaded from https source. There are many alternatives to create a web server that support https. I used Caddy and it was very easy to get started.
