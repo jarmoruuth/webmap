@@ -44,6 +44,7 @@
       var supportHTML5Dialog;
       var layerDialog;
       var settingsDialog;
+      var coordinatesBox;
       var kmlVersion = null;
       var layers = [
                       { name : 'Lynx', 
@@ -563,8 +564,10 @@
 
           settingsDialog.appendChild(document.createTextNode('Center coordinates:'));
           settingsDialog.appendChild(document.createElement("BR"));
-          var map_center = map.getCenter();      
-          settingsDialog.appendChild(document.createTextNode(String(map_center.lat()+','+String(map_center.lng()))));
+          coordinatesBox = document.createElement("INPUT");
+          coordinatesBox.setAttribute("type", "text");
+          settingsDialog.appendChild(coordinatesBox);
+          //settingsDialog.appendChild(document.createTextNode(String(map_center.lat())+','+String(map_center.lng())));
           settingsDialog.appendChild(document.createElement("BR"));
           settingsDialog.appendChild(document.createElement("BR"));          
 
@@ -601,6 +604,22 @@
           settingsCloseButton.appendChild(document.createTextNode("Close"));
           settingsCloseButton.onclick = function(){
             console.log("settingsDialog Close clicked");
+            // check if center coornates have been given
+            var new_center = coordinatesBox.value;
+            if (new_center && new_center.length > 3 
+                && new_center != coordinatesBox.defaultValue) 
+            {
+              console.log('new_center='+new_center+',defaultValue='+coordinatesBox.defaultValue);
+              var lat_lng = new_center.split(',');
+              if (lat_lng[0] && lat_lng[1]) {
+                var pos = {
+                  lat: Number(lat_lng[0]),
+                  lng: Number(lat_lng[1])
+                }
+                map.panTo(pos);
+                autoMove = false;
+              }
+            }
             settingsDialog.close();
           };
           settingsDialog.appendChild(settingsCloseButton);
@@ -757,6 +776,9 @@
           settingsButton.src = 'https://ruuth.xyz/ic_settings_black_24px.svg';
           settingsButton.addEventListener('click', function() {
             console.log("click Settings, settingsDialog.showModal()");
+            var map_center = map.getCenter();
+            coordinatesBox.value = String(map_center.lat())+','+String(map_center.lng());
+            coordinatesBox.defaultValue = coordinatesBox.value;
             settingsDialog.showModal();
           });
           setDivStyle(settingsDiv);
