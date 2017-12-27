@@ -582,7 +582,10 @@
               kmlVersion = timesec.toFixed();
               for (var i = 0; i < layers.length; i++) {
                 if (layers[i].type == 'kml') {
-                  layers[i].layer = null;
+                  if (layers[i].layer) {
+                    layers[i].layer.setMap(null);
+                    layers[i].layer = null;
+                  }
                   if (layers[i].visible) {
                     showLayer(layers[i]);
                   }
