@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>map 0.28</title>
+    <title>map 0.29</title>
     <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
     <meta charset="utf-8">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.4.4/proj4-src.js"></script>    
@@ -27,7 +27,8 @@
       // failed.", it means you probably did not give permission for the browser to
       // locate you.
       var map;
-      var id, infoWindow, marker, options
+      var id, infoWindow, marker, options;
+      var nbasemaps;
       var current_location = {lat: 60.2053791, lng: 24.6540694};          // Espoo
       //var current_location = {lat: 60.124932, lng: 24.439290};    // Kirkkonummi
       var autoMove = true;
@@ -41,9 +42,9 @@
       var start_location = current_location;
       var map_zoom = 15;
       var start_maptypeid;
-      var supportHTML5Dialog;
       var layerDialog;
-      var settingsDialog;
+      var layerDialogDiv;
+      var settingsDiv;
       var coordinatesBox;
       var kmlVersion = null;
       var mapInfoTextDiv;
@@ -77,6 +78,20 @@
                         url : 'https://ruuth.xyz/EspoonLahiretkia.kml', 
                         layer : null }
                    ];
+      var maps = [
+                      { name : 'peruskartta',
+                        altname : 'kapsi',
+                        visible : false
+                      },
+                      { name : 'ortokuvat',
+                        altname : 'kapsi',
+                        visible : false
+                      },                      
+                      { name : 'mapant',
+                        altname : 'MapAnt',
+                        visible : true
+                      }
+                ];
 
       console.log('*** body ***');
 
@@ -218,14 +233,10 @@
             }
           }
         }
-      }
-
-      // check if HTML5 dialog is supported. If not we use full down menu for layers
-      //
-      if (typeof HTMLDialogElement === 'function') {
-        supportHTML5Dialog = true;
-      } else {
-        supportHTML5Dialog = false;
+        var mapsparams = searchParams.get('maps');
+        if (mapsparams) {
+          mapsSetVisible(mapsparams);
+        }
       }
 
       restoreState(true);
@@ -264,6 +275,14 @@
         }
         console.log(visible_layers);
         sessionStorage.setItem('VisibleLayers', visible_layers);
+        var visible_maps = '';
+        for (var i = 0; i < maps.length; i++) {
+          if (maps[i].visible) {
+            visible_maps = visible_maps + maps[i].name + ' ';
+          }
+        }
+        console.log(visible_maps);
+        sessionStorage.setItem('VisibleMaps', visible_maps);
         if (path.length > 0) {
           var save_path = '';
           for (var i = 0; i < path.length; i++) {
@@ -338,6 +357,13 @@
         } else {
           console.log('restoreState:could not restore VisibleLayers');
         }
+        if (sessionStorage.getItem('VisibleMaps')) {
+          var visible_maps = sessionStorage.getItem('VisibleMaps').split(' ');
+          console.log(visible_maps);
+          mapsSetVisible(visible_maps);
+        } else {
+          console.log('restoreState:could not restore VisibleLayers');
+        }        
         if (!atStart) {
           if (sessionStorage.getItem('Path')) {
             var saved_path = sessionStorage.getItem('Path').split(' ');
@@ -354,7 +380,20 @@
             console.log('restoreState:could not restore Path');
           }
         }
-      }        
+      }
+
+      function mapsSetVisible(visible_maps) {
+        for (var j = 0; j < maps.length; j++) {
+          maps[j].visible = false;
+        }
+        for (var i = 0; i < visible_maps.length; i++) {
+            for (var j = 0; j < maps.length; j++) {
+              if (visible_maps[i] == maps[j].name || visible_maps[i] == maps[j].altname) {
+                maps[j].visible = true;
+              }
+            }
+        }
+      }
 
       // ------------------------------------------------------------
       // load layer
@@ -443,6 +482,8 @@
       // Init map
 
       function initMap() {
+        var checkBox;
+
         if (!start_maptypeid) {
           start_maptypeid = google.maps.MapTypeId.ROADMAP;
         }
@@ -464,13 +505,28 @@
             mapTypeIds: [
                 google.maps.MapTypeId.ROADMAP,
                 google.maps.MapTypeId.SATELLITE,
-                google.maps.MapTypeId.HYBRID,
-                'peruskartta',
-                'ortokuvat',
-                'mapant'
+                google.maps.MapTypeId.HYBRID
             ]
           }
         });
+
+        nbasemaps = map.mapTypeControlOptions.mapTypeIds.length;
+        setVisibleMaps();
+
+        function setVisibleMaps() {
+          var n = nbasemaps;
+          var current_nmaps = map.mapTypeControlOptions.mapTypeIds.length;
+          for (var i = 0; i < maps.length; i++) {
+            if (maps[i].visible) {
+              map.mapTypeControlOptions.mapTypeIds[n] = maps[i].name;
+              n++;
+            }
+          }
+          // clear old names
+          for (var i = n; i < current_nmaps; i++) {
+            map.mapTypeControlOptions.mapTypeIds[i] = null;
+          }
+        }
 
         // initMap: show markers listed in url
 
@@ -485,160 +541,132 @@
         }
 
         // ------------------------------------------------------------
-        // initMap: DropDown menu when HTML5 dialog is not supported
-
-        if (!supportHTML5Dialog) {
-
-          var categoryDropDown = document.createElement("SELECT");
-
-          var option = document.createElement("option");
-          option.text = "No layer";
-          categoryDropDown.add(option, 0);
-
-          for (var i = 0; i < layers.length; i++) {
-            option = document.createElement("option");
-            option.text = layers[i].shortname;
-            categoryDropDown.add(option, i + 1);
-            if (layers[i].visible) {
-              categoryDropDown.selectedIndex = i + 1;
-            }
-          }
-
-          categoryDropDown.addEventListener("change", function() {
-            var selIndex = categoryDropDown.selectedIndex;
-            console.log("categoryDropDown.selectedIndex=", selIndex);
-            // hide all non-selected layers
-            for (var i = 0; i < layers.length; i++) {
-              if (i != selIndex - 1) {
-                handleLayer(layers[i], false);
-              }           
-            }
-            // show selected layer
-            if (selIndex > 0 && selIndex <= layers.length) {
-              handleLayer(layers[selIndex - 1], true);
-            }
-          });
-
-          categoryDropDown.style.marginBottom = '22px';
-
-          map.controls[google.maps.ControlPosition.BOTTOM_LEFT].push(categoryDropDown);
-        }
-
-        // ------------------------------------------------------------
         // initMap: Dialog  menu to chose layers, with dialog menu multiple
         // layers can be visible at the same time
 
-        if (supportHTML5Dialog) {
-          var checkBox;
+        layerDialogDiv = document.createElement("div");
+        //document.body.appendChild(layerDialogDiv);
 
-          layerDialog = document.createElement("DIALOG");
-
-          document.body.appendChild(layerDialog);
-
-          // Create check box for all layers
-          for (var i = 0; i < layers.length; i++) {
-            checkBox = document.createElement("INPUT");
-            checkBox.setAttribute("type", "checkbox");
-            checkBox.value = layers[i].name;
-            checkBox.checked = layers[i].visible;
-            checkBox.onclick = function() {
-              console.log("layerDialog clicked, name=" + this.value + ",checked=", this.checked);
-              for (var i = 0; i < layers.length; i++) {
-                if (layers[i].name == this.value) {
-                  handleLayer(layers[i], this.checked);
-                }
+        // Create check box for all layers
+        for (var i = 0; i < layers.length; i++) {
+          checkBox = document.createElement("INPUT");
+          checkBox.setAttribute("type", "checkbox");
+          checkBox.value = layers[i].name;
+          checkBox.checked = layers[i].visible;
+          checkBox.onclick = function() {
+            console.log("layerDialog clicked, name=" + this.value + ",checked=", this.checked);
+            for (var i = 0; i < layers.length; i++) {
+              if (layers[i].name == this.value) {
+                handleLayer(layers[i], this.checked);
               }
-            };
-            layerDialog.appendChild(checkBox);
-            layerDialog.appendChild(document.createTextNode(layers[i].name));
-            layerDialog.appendChild(document.createElement("BR"));            
-          }
-
-          // Close button
-          var layerCloseButton = document.createElement("BUTTON");
-          layerCloseButton.appendChild(document.createTextNode("Close"));
-          layerCloseButton.onclick = function(){
-            console.log("layerDialog Close clicked");
-            layerDialog.close();
+            }
           };
-          layerDialog.appendChild(layerCloseButton);
+          layerDialogDiv.appendChild(checkBox);
+          layerDialogDiv.appendChild(document.createTextNode(layers[i].name));
+          layerDialogDiv.appendChild(document.createElement("BR"));            
         }
+
+        // Close button
+        var layerCloseButton = document.createElement("BUTTON");
+        layerCloseButton.appendChild(document.createTextNode("Close"));
+        layerCloseButton.onclick = function(){
+          console.log("layerDialog Close clicked");
+          infoWindow.close();
+        };
+        layerDialogDiv.appendChild(layerCloseButton);
 
         // ------------------------------------------------------------
         // initMap: Settings dialog  menu
 
-        if (supportHTML5Dialog) {
-          var checkBox;
+        settingsDiv = document.createElement("div");
+        //document.body.appendChild(settingsDiv);
 
-          settingsDialog = document.createElement("DIALOG");
+        settingsDiv.appendChild(document.createTextNode('Center coordinates:'));
+        settingsDiv.appendChild(document.createElement("BR"));
+        coordinatesBox = document.createElement("INPUT");
+        coordinatesBox.setAttribute("type", "text");
+        settingsDiv.appendChild(coordinatesBox);
+        //settingsDiv.appendChild(document.createTextNode(String(map_center.lat())+','+String(map_center.lng())));
+        settingsDiv.appendChild(document.createElement("BR"));
+        settingsDiv.appendChild(document.createElement("BR"));
+        // Create check box for all maps
+        //settingsDiv.appendChild(document.createTextNode('Maps:'));
+        //settingsDiv.appendChild(document.createElement("BR"));        
+        //for (var i = 0; i < maps.length; i++) {
+        //  checkBox = document.createElement("INPUT");
+        //  checkBox.setAttribute("type", "checkbox");
+          // checkBox.value = maps[i].name;
+          // checkBox.checked = maps[i].visible;
+          // checkBox.onclick = function() {
+            // console.log("settingsDialog clicked, map=" + this.value + ",checked=", this.checked);
+            // for (var i = 0; i < maps.length; i++) {
+              // if (maps[i].name == this.value) {
+                // maps[i].visible = this.checked;
+              // }
+            // }
+          // };
+          // settingsDiv.appendChild(checkBox);
+          // settingsDiv.appendChild(document.createTextNode(maps[i].name));
+          // settingsDiv.appendChild(document.createElement("BR"));            
+        // }        
+        // settingsDiv.appendChild(document.createElement("BR"));          
 
-          document.body.appendChild(settingsDialog);
-
-          settingsDialog.appendChild(document.createTextNode('Center coordinates:'));
-          settingsDialog.appendChild(document.createElement("BR"));
-          coordinatesBox = document.createElement("INPUT");
-          coordinatesBox.setAttribute("type", "text");
-          settingsDialog.appendChild(coordinatesBox);
-          //settingsDialog.appendChild(document.createTextNode(String(map_center.lat())+','+String(map_center.lng())));
-          settingsDialog.appendChild(document.createElement("BR"));
-          settingsDialog.appendChild(document.createElement("BR"));          
-
-          // Create check box for KML refresh
-          checkBox = document.createElement("INPUT");
-          checkBox.setAttribute("type", "checkbox");
-          checkBox.value = 'Force KML refresh';
-          checkBox.checked = kmlVersion != null;
-          checkBox.onclick = function() {
-            if (this.checked) {
-              var timesec = Date.now() / 1000;
-              kmlVersion = timesec.toFixed();
-              for (var i = 0; i < layers.length; i++) {
-                if (layers[i].type == 'kml') {
-                  if (layers[i].layer) {
-                    layers[i].layer.setMap(null);
-                    layers[i].layer = null;
-                  }
-                  if (layers[i].visible) {
-                    showLayer(layers[i]);
-                  }
+        // Create check box for KML refresh
+        checkBox = document.createElement("INPUT");
+        checkBox.setAttribute("type", "checkbox");
+        checkBox.value = 'Force KML refresh';
+        checkBox.checked = kmlVersion != null;
+        checkBox.onclick = function() {
+          if (this.checked) {
+            var timesec = Date.now() / 1000;
+            kmlVersion = timesec.toFixed();
+            for (var i = 0; i < layers.length; i++) {
+              if (layers[i].type == 'kml') {
+                if (layers[i].layer) {
+                  layers[i].layer.setMap(null);
+                  layers[i].layer = null;
+                }
+                if (layers[i].visible) {
+                  showLayer(layers[i]);
                 }
               }
-            } else {
-              kmlVersion = null;
             }
-            console.log("settingsDialog clicked, name=" + this.value + ",checked=", this.checked+",kmlVersion="+kmlVersion);
+          } else {
+            kmlVersion = null;
+          }
+          console.log("settingsDiv clicked, name=" + this.value + ",checked=", this.checked+",kmlVersion="+kmlVersion);
 
-          };
-          settingsDialog.appendChild(checkBox);
-          settingsDialog.appendChild(document.createTextNode('Force KML refresh'));
-          settingsDialog.appendChild(document.createElement("BR")); 
-          settingsDialog.appendChild(document.createElement("BR"));           
+        };
+        settingsDiv.appendChild(checkBox);
+        settingsDiv.appendChild(document.createTextNode('Force KML refresh'));
+        settingsDiv.appendChild(document.createElement("BR")); 
+        settingsDiv.appendChild(document.createElement("BR"));           
 
-          // Close button
-          var settingsCloseButton = document.createElement("BUTTON");
-          settingsCloseButton.appendChild(document.createTextNode("Close"));
-          settingsCloseButton.onclick = function(){
-            console.log("settingsDialog Close clicked");
-            // check if center coornates have been given
-            var new_center = coordinatesBox.value;
-            if (new_center && new_center.length > 3 
-                && new_center != coordinatesBox.defaultValue) 
-            {
-              console.log('new_center='+new_center+',defaultValue='+coordinatesBox.defaultValue);
-              var lat_lng = new_center.split(',');
-              if (lat_lng[0] && lat_lng[1]) {
-                var pos = {
-                  lat: Number(lat_lng[0]),
-                  lng: Number(lat_lng[1])
-                }
-                map.panTo(pos);
-                autoMove = false;
+        // Close button
+        var settingsCloseButton = document.createElement("BUTTON");
+        settingsCloseButton.appendChild(document.createTextNode("Close"));
+        settingsCloseButton.onclick = function(){
+          console.log("settingsDiv Close clicked");
+          // check if new center coordinates have been given
+          var new_center = coordinatesBox.value;
+          if (new_center && new_center.length > 3 
+              && new_center != coordinatesBox.defaultValue) 
+          {
+            console.log('new_center='+new_center+',defaultValue='+coordinatesBox.defaultValue);
+            var lat_lng = new_center.split(',');
+            if (lat_lng[0] && lat_lng[1]) {
+              var pos = {
+                lat: Number(lat_lng[0]),
+                lng: Number(lat_lng[1])
               }
+              map.panTo(pos);
+              autoMove = false;
             }
-            settingsDialog.close();
-          };
-          settingsDialog.appendChild(settingsCloseButton);
-        }
+          }
+          //setVisibleMaps();
+          infoWindow.close();
+        };
+        settingsDiv.appendChild(settingsCloseButton);
 
         // ------------------------------------------------------------
         // initMap: Crosshair to show the map center
@@ -669,7 +697,6 @@
         });
 
         map.mapTypes.set('peruskartta', perusMapType);
-        //map.setMapTypeId('peruskartta'); // default is roadmap
 
         // ------------------------------------------------------------
         // initMap: Ortoilmakuvat
@@ -705,7 +732,6 @@
         });
 
         map.mapTypes.set('mapant', mapantMapType);
-        //map.setMapTypeId('peruskartta'); // default is roadmap      
 
         // ------------------------------------------------------------
         // initMap: Init some variables
@@ -791,41 +817,45 @@
         map.controls[google.maps.ControlPosition.BOTTOM_CENTER].push(externalMapsDiv);
 
         // ----------------------------------------------------------
-        // initMap: HTML5 dialog for layers
+        // initMap: dialog for layers
 
-        if (supportHTML5Dialog) {
-          var layersDiv = document.createElement('div');
-          var layersButton = document.createElement("IMG");
-          layersButton.src = 'https://ruuth.xyz/ic_layers_black_24px.svg';
-          layersButton.addEventListener('click', function() {
-            console.log("click Layer, layerDialog.showModal()");
-            layerDialog.showModal();
-          });
-          setDivStyle(layersDiv);
-          layersDiv.style.marginLeft = '11px';
-          layersDiv.appendChild(layersButton);
-          map.controls[google.maps.ControlPosition.LEFT_CENTER].push(layersDiv);
-        }
+        var layersDiv = document.createElement('div');
+        var layersButton = document.createElement("IMG");
+        layersButton.src = 'https://ruuth.xyz/ic_layers_black_24px.svg';
+        layersButton.addEventListener('click', function() {
+          console.log("click Layer, layerDialogDiv");
+          infoWindow.close();
+          infoWindow.setContent(layerDialogDiv);
+          infoWindow.setPosition(map.getCenter());
+          infoWindow.open(map);
+        });
+        setDivStyle(layersDiv);
+        layersDiv.style.marginLeft = '11px';
+        layersDiv.appendChild(layersButton);
+        map.controls[google.maps.ControlPosition.LEFT_CENTER].push(layersDiv);
 
         // ----------------------------------------------------------
-        // initMap: HTML5 dialog for settings
+        // initMap: dialog for settings
 
-        if (supportHTML5Dialog) {
-          var settingsDiv = document.createElement('div');
-          var settingsButton = document.createElement("IMG");
-          settingsButton.src = 'https://ruuth.xyz/ic_settings_black_24px.svg';
-          settingsButton.addEventListener('click', function() {
-            console.log("click Settings, settingsDialog.showModal()");
-            var map_center = map.getCenter();
-            coordinatesBox.value = String(map_center.lat())+','+String(map_center.lng());
-            coordinatesBox.defaultValue = coordinatesBox.value;
-            settingsDialog.showModal();
-          });
-          setDivStyle(settingsDiv);
-          settingsDiv.style.marginLeft = '11px';
-          settingsDiv.appendChild(settingsButton);
-          map.controls[google.maps.ControlPosition.LEFT_BOTTOM].push(settingsDiv);
-        }
+        var settingsButtonDiv = document.createElement('div');
+        var settingsButton = document.createElement("IMG");
+        settingsButton.src = 'https://ruuth.xyz/ic_settings_black_24px.svg';
+        settingsButton.addEventListener('click', function() {
+          console.log("click Settings");
+          var map_center = map.getCenter();
+          coordinatesBox.value = String(map_center.lat())+','+String(map_center.lng());
+          coordinatesBox.defaultValue = coordinatesBox.value;
+          infoWindow.close();
+          infoWindow.setContent(settingsDiv);
+          infoWindow.setPosition(map_center);
+          infoWindow.open(map);
+          
+        });
+        setDivStyle(settingsButtonDiv);
+        settingsButtonDiv.style.marginLeft = '11px';
+        settingsButtonDiv.appendChild(settingsButton);
+        map.controls[google.maps.ControlPosition.LEFT_BOTTOM].push(settingsButtonDiv);
+
         // ------------------------------------------------------------
         // initMap: Geolocation error
 
@@ -834,6 +864,7 @@
                                 'Error: The Geolocation service failed.' :
                                 'Error: Your browser doesn\'t support geolocation.';
           console.log(msg);
+          infoWindow.close();
           infoWindow.setPosition(pos);
           infoWindow.setContent(msg);
           infoWindow.open(map);
@@ -853,6 +884,8 @@
           } else if (map.getMapTypeId() == 'mapant') {
             mapInfoTextDiv.innerHTML = 'Maanmittauslaitos, MapAnt';
             showStreetViewControl = false;
+          } else {
+            mapInfoTextDiv.innerHTML = '';
           }
           map.setOptions({
             streetViewControl: showStreetViewControl
@@ -929,6 +962,7 @@
                 });
                 // click the marker to get coordinates
                 marker.addListener('click', function() {
+                    infoWindow.close();
                     infoWindow.setPosition(current_location);
                     infoWindow.setContent('Lat: ' + current_location.lat + ' Lng: ' + current_location.lng);
                     infoWindow.open(map);
@@ -943,6 +977,7 @@
       // Error function for position change watch
 
       function watchError(err) {
+        infoWindow.close();
         infoWindow.setPosition(pos);
         infoWindow.setContent('Watch Error(' + err.code + '): ' + err.message);
         console.log('Watch Error(' + err.code + '): ' + err.message);
