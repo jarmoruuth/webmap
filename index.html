@@ -642,6 +642,18 @@
         settingsDiv.appendChild(document.createElement("BR")); 
         settingsDiv.appendChild(document.createElement("BR"));           
 
+        settingsDiv.appendChild(document.createTextNode('Attribution:'));
+        settingsDiv.appendChild(document.createElement("BR"));           
+        settingsDiv.appendChild(document.createTextNode('http://www.maanmittauslaitos.fi/'));
+        settingsDiv.appendChild(document.createElement("BR"));           
+        settingsDiv.appendChild(document.createTextNode('http://www.mapant.fi/'));
+        settingsDiv.appendChild(document.createElement("BR"));           
+        settingsDiv.appendChild(document.createTextNode('https://www.kapsi.fi/'));
+        settingsDiv.appendChild(document.createElement("BR"));           
+
+        settingsDiv.appendChild(document.createElement("BR"));           
+        
+
         // Close button
         var settingsCloseButton = document.createElement("BUTTON");
         settingsCloseButton.appendChild(document.createTextNode("Close"));
@@ -813,6 +825,7 @@
         mapInfoTextDiv.style.textAlign = "center";
         externalMapsDiv.appendChild(mapInfoTextDiv);
         //externalMapsDiv.style.marginBottom = '22px';
+        externalMapsDiv.style.marginBottom = '2px';
 
         map.controls[google.maps.ControlPosition.BOTTOM_CENTER].push(externalMapsDiv);
 
