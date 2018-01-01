@@ -46,7 +46,7 @@
       var layerDialogDiv;
       var settingsDiv;
       var coordinatesBox;
-      var kmlVersion = null;
+      var kmlVersion = 3;
       var mapInfoTextDiv;
       var layers = [
                       { name : 'Lynx', 
@@ -643,26 +643,47 @@
         settingsDiv.appendChild(document.createTextNode('Force KML refresh'));
         settingsDiv.appendChild(document.createElement("BR")); 
         settingsDiv.appendChild(document.createElement("BR"));
+        
+        var atttribution_kapsi = false;
+        var atttribution_mapant = false;
+        for (var i = 0; i < maps.length; i++) {
+          if (maps[i].visible) {
+            if (maps[i].altname == 'kapsi') {
+              atttribution_kapsi = true;
+            }
+            if (maps[i].name == 'mapant') {
+              atttribution_mapant = true;
+            }
+          }
+        }
 
-        settingsDiv.appendChild(document.createTextNode('Attribution:'));
-        settingsDiv.appendChild(document.createElement("BR"));
-        var lnk = document.createElement("a");
-        lnk.href = 'http://www.maanmittauslaitos.fi/';
-        lnk.appendChild(document.createTextNode(lnk.href));
-        settingsDiv.appendChild(lnk);
-        settingsDiv.appendChild(document.createElement("BR")); 
-        lnk = document.createElement("a");
-        lnk.href = 'http://www.mapant.fi/';    
-        lnk.appendChild(document.createTextNode(lnk.href));
-        settingsDiv.appendChild(lnk);
-        settingsDiv.appendChild(document.createElement("BR"));
-        lnk = document.createElement("a");
-        lnk.href = 'https://www.kapsi.fi/';
-        lnk.appendChild(document.createTextNode(lnk.href));
-        settingsDiv.appendChild(lnk);
-        settingsDiv.appendChild(document.createElement("BR"));           
+        if (atttribution_mapant || atttribution_kapsi) {
+          settingsDiv.appendChild(document.createTextNode('Attribution:'));
+          settingsDiv.appendChild(document.createElement("BR"));
+          var lnk = document.createElement("a");
+          lnk.href = 'http://www.maanmittauslaitos.fi/';
+          lnk.appendChild(document.createTextNode(lnk.href));
+          settingsDiv.appendChild(lnk);
+          settingsDiv.appendChild(document.createElement("BR")); 
+        }
+        if (atttribution_mapant) {
+          lnk = document.createElement("a");
+          lnk.href = 'http://www.mapant.fi/';    
+          lnk.appendChild(document.createTextNode(lnk.href));
+          settingsDiv.appendChild(lnk);
+          settingsDiv.appendChild(document.createElement("BR"));
+        }
+        if (atttribution_kapsi) {
+          lnk = document.createElement("a");
+          lnk.href = 'https://www.kapsi.fi/';
+          lnk.appendChild(document.createTextNode(lnk.href));
+          settingsDiv.appendChild(lnk);
+          settingsDiv.appendChild(document.createElement("BR"));    
+        }       
 
-        settingsDiv.appendChild(document.createElement("BR"));           
+        if (atttribution_mapant || atttribution_kapsi) {
+          settingsDiv.appendChild(document.createElement("BR"));
+        }
 
         // Close button
         var settingsCloseButton = document.createElement("BUTTON");
