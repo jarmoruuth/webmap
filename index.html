@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>map 0.30</title>
+    <title>map 0.31</title>
     <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
     <meta charset="utf-8">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.4.4/proj4-src.js"></script>    
@@ -81,15 +81,15 @@
       var maps = [
                       { name : 'peruskartta',
                         altname : 'kapsi',
-                        visible : false
+                        visible : true
                       },
                       { name : 'ortokuvat',
                         altname : 'kapsi',
-                        visible : false
+                        visible : true
                       },                      
                       { name : 'mapant',
                         altname : 'MapAnt',
-                        visible : true
+                        visible : false
                       }
                 ];
 
@@ -235,7 +235,7 @@
         }
         var mapsparams = searchParams.get('maps');
         if (mapsparams) {
-          mapsSetVisible(mapsparams);
+          mapsSetVisible(mapsparams.split(','));
         }
       }
 
@@ -383,12 +383,14 @@
       }
 
       function mapsSetVisible(visible_maps) {
+        console.log("mapsSetVisible, visible_maps="+visible_maps);
         for (var j = 0; j < maps.length; j++) {
           maps[j].visible = false;
         }
         for (var i = 0; i < visible_maps.length; i++) {
             for (var j = 0; j < maps.length; j++) {
               if (visible_maps[i] == maps[j].name || visible_maps[i] == maps[j].altname) {
+                console.log("set map " + maps[j].name + "visible");
                 maps[j].visible = true;
               }
             }
