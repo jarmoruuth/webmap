@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>map 0.29</title>
+    <title>map 0.30</title>
     <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
     <meta charset="utf-8">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.4.4/proj4-src.js"></script>    
@@ -117,11 +117,11 @@
           newlayer.url = newvalues[0];
           newlayer.name = newvalues[1];
           if (newvalues[2]) {
-            newlayer.shortname = newvalues[2];
+            newlayer.visible = Number(newvalues[2]);
           } else {
-            newlayer.shortname = newlayer.name.substring(0, 7);
+            newlayer.visible = false;
           }
-          newlayer.visible = false;
+          newlayer.shortname = newlayer.name.substring(0, 7);
           newlayer.layer = null;
           layers[layers.length] = newlayer;
         } else {
@@ -146,11 +146,11 @@
           newlayer.tab = newvalues[1];
           newlayer.name = newvalues[2];
           if (newvalues[3]) {
-            newlayer.shortname = newvalues[3];
+            newlayer.visible = restoreBool(newvalues[3]);
           } else {
-            newlayer.shortname = newlayer.name.substring(0, 7);
+            newlayer.visible = false;
           }
-          newlayer.visible = false;
+          newlayer.shortname = newlayer.name.substring(0, 7);
           newlayer.layer = null;
           layers[layers.length] = newlayer;
         } else {
@@ -640,19 +640,27 @@
         settingsDiv.appendChild(checkBox);
         settingsDiv.appendChild(document.createTextNode('Force KML refresh'));
         settingsDiv.appendChild(document.createElement("BR")); 
-        settingsDiv.appendChild(document.createElement("BR"));           
+        settingsDiv.appendChild(document.createElement("BR"));
 
         settingsDiv.appendChild(document.createTextNode('Attribution:'));
-        settingsDiv.appendChild(document.createElement("BR"));           
-        settingsDiv.appendChild(document.createTextNode('http://www.maanmittauslaitos.fi/'));
-        settingsDiv.appendChild(document.createElement("BR"));           
-        settingsDiv.appendChild(document.createTextNode('http://www.mapant.fi/'));
-        settingsDiv.appendChild(document.createElement("BR"));           
-        settingsDiv.appendChild(document.createTextNode('https://www.kapsi.fi/'));
+        settingsDiv.appendChild(document.createElement("BR"));
+        var lnk = document.createElement("a");
+        lnk.href = 'http://www.maanmittauslaitos.fi/';
+        lnk.appendChild(document.createTextNode(lnk.href));
+        settingsDiv.appendChild(lnk);
+        settingsDiv.appendChild(document.createElement("BR")); 
+        lnk = document.createElement("a");
+        lnk.href = 'http://www.mapant.fi/';    
+        lnk.appendChild(document.createTextNode(lnk.href));
+        settingsDiv.appendChild(lnk);
+        settingsDiv.appendChild(document.createElement("BR"));
+        lnk = document.createElement("a");
+        lnk.href = 'https://www.kapsi.fi/';
+        lnk.appendChild(document.createTextNode(lnk.href));
+        settingsDiv.appendChild(lnk);
         settingsDiv.appendChild(document.createElement("BR"));           
 
         settingsDiv.appendChild(document.createElement("BR"));           
-        
 
         // Close button
         var settingsCloseButton = document.createElement("BUTTON");
@@ -677,6 +685,38 @@
           }
           //setVisibleMaps();
           infoWindow.close();
+        };
+        settingsDiv.appendChild(settingsCloseButton);
+
+        // Help button
+        var settingsCloseButton = document.createElement("BUTTON");
+        settingsCloseButton.style.marginLeft = '11px'
+        settingsCloseButton.appendChild(document.createTextNode("Help"));
+        settingsCloseButton.onclick = function(){
+          console.log("settingsDiv Help clicked");
+          infoWindow.close();
+          var contentString = '<div id="content">'+
+            '<div id="siteHelp">'+
+            '</div>'+
+            '<h1 id="helpHeading" class="helpHeading">Url parameters</h1>'+
+            '<div id="bodyContent">'+
+            '<p>' +
+            'kml=url,name[,1]<br> ' +
+            'fusion=column,table,name[,1]<br> ' +
+            'path=maxdots[,interval sec[,min distance meters]]<br> ' +
+            'center=lat,lng[,label]<br> ' +
+            'marker=lat,lng[,label]<br> ' +
+            'layers=name[,name...]<br> ' +
+            'maps=name[,name...]<br>' + 
+            '</p> ' +
+            '<p>Url can have multiple kml, fusion and marker parameters.<br>' +
+            'Possible maps are peruskartta, ortokuvat and mapant.'
+            '</p>' +
+            '</div>'+
+            '</div>';
+          infoWindow.setContent(contentString);
+          infoWindow.setPosition(map.getCenter());
+          infoWindow.open(map);
         };
         settingsDiv.appendChild(settingsCloseButton);
 
