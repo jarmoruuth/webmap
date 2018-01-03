@@ -76,7 +76,13 @@
                         visible : false, 
                         type : 'kml', 
                         url : 'https://ruuth.xyz/EspoonLahiretkia.kml', 
-                        layer : null }
+                        layer : null },
+                      { name : 'Old maps', 
+                        shortname : 'Old maps',
+                        visible : false, 
+                        type : 'oldmaps', 
+                        url : null, 
+                        layer : null }    // Array of overlay layers                    
                    ];
       var maps = [
                       { name : 'peruskartta',
@@ -92,6 +98,72 @@
                         visible : false
                       }
                 ];
+      var overlayMaps = [
+                      { url : 'https://ruuth.xyz/DSCF2190-Edit-2.jpg',
+                        bounds : {
+                          north: 60.15787151807389,
+                          south: 60.10657910193598,
+                          east: 24.44434820064698,
+                          west: 24.37297998317872
+                        }
+                      },
+                      { url : 'https://ruuth.xyz/DSCF2185-e.jpg',
+                        bounds : {
+                          north: 60.172389836465804,
+                          south: 60.12174005859273,
+                          east: 24.639806135980233,
+                          west: 24.572085722772226
+                        }
+                      },
+                      { url : 'https://ruuth.xyz/DSCF2193-e.jpg',
+                      bounds : {
+                        north: 60.164256098240266,
+                        south: 60.11263149154279,
+                        east: 24.49608264812623,
+                        west: 24.42540107616578
+                      }
+                      },
+                      { url : 'https://ruuth.xyz/DSCF2195-e.jpg',
+                      bounds : {
+                        north: 60.1440304449622,
+                        south: 60.09340115006546,
+                        east: 24.25135789760743,
+                        west: 24.177586420861825
+                        }
+                      }/*,
+                      { url : 'https://ruuth.xyz/DSCF2197-e.jpg',
+                      bounds : {
+                        north: ,
+                        south: ,
+                        east: ,
+                        west: 
+                        }
+                      },
+                      { url : 'https://ruuth.xyz/DSCF2199-e.jpg',
+                      bounds : {
+                        north: ,
+                        south: ,
+                        east: ,
+                        west: 
+                        }
+                      },
+                      { url : 'https://ruuth.xyz/DSCF2201-e.jpg',
+                      bounds : {
+                        north: ,
+                        south: ,
+                        east: ,
+                        west: 
+                        }
+                      },
+                      { url : 'https://ruuth.xyz/DSCF2202-e.jpg',
+                      bounds : {
+                        north: ,
+                        south: ,
+                        east: ,
+                        west: 
+                        }
+                      }*/
+      ];
 
       console.log('*** body ***');
 
@@ -421,6 +493,14 @@
                 from: layer.tab
               }
             });            
+          } else if (layer.type == 'oldmaps') {
+            layer.layer = [];
+            for (var i = 0; i < overlayMaps.length; i++) {
+              var newOverlay = new google.maps.GroundOverlay(
+                                                  overlayMaps[i].url,
+                                                  overlayMaps[i].bounds);
+              layer.layer[layer.layer.length] = newOverlay;
+            }
           }
         }
       }
@@ -432,20 +512,32 @@
         console.log("showLayer:layer=", layer.name);
           loadLayer(layer);
           if (map) {
-            layer.layer.setMap(map);
+            if (layer.type == 'oldmaps') {
+              for (var i = 0; i< layer.layer.length; i++) {
+                layer.layer[i].setMap(map);
+              }            
+            } else {
+              layer.layer.setMap(map);
+            }
           }
       }
 
       function hideLayer(layer) {
         console.log("hideLayer:layer=", layer.name);
           if (map) {
-            layer.layer.setMap(null);
+            if (layer.type == 'oldmaps') {
+              for (var i = 0; i < layer.layer.length; i++) {
+                layer.layer[i].setMap(null);
+              }            
+            } else {
+              layer.layer.setMap(null);
+            }
           }
       }
 
       function showVisibleLayers() {
         for (var i = 0; i < layers.length; i++) {
-          if (layers[i].visible) {
+          if (layers[i].visible) {            
             showLayer(layers[i]);
           }
         }
