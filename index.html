@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>map 0.31</title>
+    <title>map 0.32</title>
     <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
     <meta charset="utf-8">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.4.4/proj4-src.js"></script>    
@@ -46,123 +46,73 @@
       var layerDialogDiv;
       var settingsDiv;
       var coordinatesBox;
-      var kmlVersion = 3;
+      var kmlVersion = 4;
       var mapInfoTextDiv;
       var layers = [
-                      { name : 'Lynx', 
-                        shortname : 'Lynx',
-                        visible : false, 
-                        type : 'kml', 
+                      { name : 'Lynx',  visible : false,  type : 'kml', 
                         url : 'https://ruuth.xyz/Lynx.kmz', 
                         layer : null 
                       },
-                      { name : 'Muinaisjäännökset', 
-                        shortname : 'Muinj',
-                        visible : false, 
-                        type : 'fusion',  
-                        col : '\'sijainti\'', 
-                        tab : '1BTqOeSzHYH_ub8-ef_BbUvP-s89VjEdfvtyKVMk', 
+                      { name : 'Muinaisjäännökset', visible : false, type : 'fusion',  
+                        col : '\'sijainti\'', tab : '1BTqOeSzHYH_ub8-ef_BbUvP-s89VjEdfvtyKVMk', 
                         layer : null 
                       },
-                      { name : 'Planetskier', 
-                        shortname : 'Planetski',
-                        visible : false, 
-                        type : 'kml', 
+                      { name : 'Planetskier', visible : false, type : 'kml', 
                         url : 'https://planetskier.net/locations.kmz', 
                         layer : null 
                       },
-                      { name : 'Jarmo', 
-                        shortname : 'Jarmo',
-                        visible : false, 
-                        type : 'kml', 
+                      { name : 'Jarmo', visible : false, type : 'kml', 
                         url : 'https://ruuth.xyz/EspoonLahiretkia.kml', 
-                        layer : null },
-                      { name : 'Old maps', 
-                        shortname : 'Old maps',
-                        visible : false, 
-                        type : 'oldmaps', 
+                        layer : null 
+                      },
+                      { name : 'Old maps', visible : false, type : 'oldmaps', 
                         url : null, 
                         layer : null }    // Array of overlay layers                    
                    ];
       var maps = [
-                      { name : 'peruskartta',
-                        altname : 'kapsi',
-                        visible : true
+                      { name : 'peruskartta', altname : 'kapsi', visible : true
                       },
-                      { name : 'ortokuvat',
-                        altname : 'kapsi',
-                        visible : true
+                      { name : 'ortokuvat', altname : 'kapsi', visible : true
                       },                      
-                      { name : 'mapant',
-                        altname : 'MapAnt',
-                        visible : false
+                      { name : 'mapant', altname : 'MapAnt', visible : false
                       }
                 ];
       var overlayMaps = [
-                      { url : 'https://ruuth.xyz/DSCF2190-Edit-2.jpg',
-                        bounds : {
-                          north: 60.15787151807389,
-                          south: 60.10657910193598,
-                          east: 24.44434820064698,
-                          west: 24.37297998317872
-                        }
+                      // Overlay map layout:
+                      //  1 2 3 4 5 6 7
+                      //  8
+                      { url : 'https://ruuth.xyz/DSCF2190-Edit-2.jpg',  // 1. ingels - kirkkonummi
+                        bounds : { north: 60.15787151807389, south: 60.10657910193598, 
+                                   east: 24.44434820064698, west: 24.37297998317872 }
                       },
-                      { url : 'https://ruuth.xyz/DSCF2185-e.jpg',
-                        bounds : {
-                          north: 60.172389836465804,
-                          south: 60.12174005859273,
-                          east: 24.639806135980233,
-                          west: 24.572085722772226
-                        }
+                      { url : 'https://ruuth.xyz/DSCF2185-e.jpg',       // 2. kivenlahden silta
+                        bounds : { north: 60.171301050355815, south: 60.12108803588506, 
+                                   east: 24.641129811651545, west: 24.570043743920937 }
                       },
-                      { url : 'https://ruuth.xyz/DSCF2193-e.jpg',
-                      bounds : {
-                        north: 60.164256098240266,
-                        south: 60.11263149154279,
-                        east: 24.49608264812623,
-                        west: 24.42540107616578
+                      { url : 'https://ruuth.xyz/DSCF2193-e.jpg',       // 3. sepänkylä - gesterby
+                        bounds : { north: 60.164256098240266, south: 60.11263149154279, 
+                                   east: 24.49608264812623, west: 24.42540107616578 }
+                      },
+                      { url : 'https://ruuth.xyz/DSCF2195-e.jpg',       // 4. siuntio - billskog
+                        bounds : {  north: 60.1440304449622, south: 60.09340115006546, 
+                                    east: 24.25135789760743, west: 24.177586420861825 }
+                      },
+                      { url : 'https://ruuth.xyz/DSCF2197-e.jpg',       // 5. lappträsk - vikträsk
+                        bounds : { north: 60.15666031630041, south: 60.10555851363581, 
+                                   east: 24.333760176800485, west: 24.260675345562692 }
+                      },
+                      { url : 'https://ruuth.xyz/DSCF2199-e.jpg',       // 6. degerby
+                        bounds : { north: 60.101558497190446, south: 60.05298482371069, 
+                                   east: 24.183706675671335, west: 24.11388341059565 }
+                      },
+                      { url : 'https://ruuth.xyz/DSCF2181-e.jpg',       // 7. masala - sundberg
+                        bounds : { north: 60.18693484580627, south: 60.13539698286657, 
+                                   east: 24.578924020178157, west: 24.504766305334407 }
+                      },
+                      { url : 'https://ruuth.xyz/DSCF2202-e.jpg',       // 8. siggans
+                        bounds : { north: 60.141194955843204, south: 60.09062549367392, 
+                                   east: 24.172291194103952, west: 24.101609622143503 }
                       }
-                      },
-                      { url : 'https://ruuth.xyz/DSCF2195-e.jpg',
-                      bounds : {
-                        north: 60.1440304449622,
-                        south: 60.09340115006546,
-                        east: 24.25135789760743,
-                        west: 24.177586420861825
-                        }
-                      }/*,
-                      { url : 'https://ruuth.xyz/DSCF2197-e.jpg',
-                      bounds : {
-                        north: ,
-                        south: ,
-                        east: ,
-                        west: 
-                        }
-                      },
-                      { url : 'https://ruuth.xyz/DSCF2199-e.jpg',
-                      bounds : {
-                        north: ,
-                        south: ,
-                        east: ,
-                        west: 
-                        }
-                      },
-                      { url : 'https://ruuth.xyz/DSCF2201-e.jpg',
-                      bounds : {
-                        north: ,
-                        south: ,
-                        east: ,
-                        west: 
-                        }
-                      },
-                      { url : 'https://ruuth.xyz/DSCF2202-e.jpg',
-                      bounds : {
-                        north: ,
-                        south: ,
-                        east: ,
-                        west: 
-                        }
-                      }*/
       ];
 
       console.log('*** body ***');
@@ -174,7 +124,7 @@
       var searchParams = new URLSearchParams(url.search.slice(1));
 
       // check kml parameters for a new layers
-      // kml=<url>,<name>[,<shortname>]
+      // kml=<url>,<name>[,<visible if != 0>]
       //
       var kmlparams = searchParams.getAll('kml');
       for (var i = 0; i < kmlparams.length; i++) {
@@ -193,7 +143,6 @@
           } else {
             newlayer.visible = false;
           }
-          newlayer.shortname = newlayer.name.substring(0, 7);
           newlayer.layer = null;
           layers[layers.length] = newlayer;
         } else {
@@ -202,7 +151,7 @@
       }
 
       // check fusion table parameters for a new layers
-      // fusion=<column>,<table<>,<name>[,<shortname>]
+      // fusion=<column>,<table<>,<name>[,<visible if != 0>]
       //
       var fusionparams = searchParams.getAll('fusion');
       for (var i = 0; i < fusionparams.length; i++) {
@@ -222,7 +171,6 @@
           } else {
             newlayer.visible = false;
           }
-          newlayer.shortname = newlayer.name.substring(0, 7);
           newlayer.layer = null;
           layers[layers.length] = newlayer;
         } else {
@@ -342,7 +290,7 @@
         saveBool('AutoMove', autoMove);
         for (var i = 0; i < layers.length; i++) {
           if (layers[i].visible) {
-            visible_layers = visible_layers + layers[i].name + ' ';
+            visible_layers = visible_layers + layers[i].name + ',';
           }
         }
         console.log(visible_layers);
@@ -417,8 +365,8 @@
           kmlVersion = sessionStorage.getItem('kmlVersion');
         }
         if (sessionStorage.getItem('VisibleLayers')) {
-          var visible_layers = sessionStorage.getItem('VisibleLayers').split(' ');
-          console.log(visible_layers);
+          var visible_layers = sessionStorage.getItem('VisibleLayers').split(',');
+          console.log('visible_layers='+visible_layers);
           for (var i = 0; i < visible_layers.length; i++) {
               for (var j = 0; j < layers.length; j++) {
                 if (visible_layers[i] == layers[j].name) {
@@ -462,7 +410,7 @@
         for (var i = 0; i < visible_maps.length; i++) {
             for (var j = 0; j < maps.length; j++) {
               if (visible_maps[i] == maps[j].name || visible_maps[i] == maps[j].altname) {
-                console.log("set map " + maps[j].name + "visible");
+                console.log("set map " + maps[j].name + " visible");
                 maps[j].visible = true;
               }
             }
@@ -749,34 +697,6 @@
           }
         }
 
-        if (atttribution_mapant || atttribution_kapsi) {
-          settingsDiv.appendChild(document.createTextNode('Attribution:'));
-          settingsDiv.appendChild(document.createElement("BR"));
-          var lnk = document.createElement("a");
-          lnk.href = 'http://www.maanmittauslaitos.fi/';
-          lnk.appendChild(document.createTextNode(lnk.href));
-          settingsDiv.appendChild(lnk);
-          settingsDiv.appendChild(document.createElement("BR")); 
-        }
-        if (atttribution_mapant) {
-          lnk = document.createElement("a");
-          lnk.href = 'http://www.mapant.fi/';    
-          lnk.appendChild(document.createTextNode(lnk.href));
-          settingsDiv.appendChild(lnk);
-          settingsDiv.appendChild(document.createElement("BR"));
-        }
-        if (atttribution_kapsi) {
-          lnk = document.createElement("a");
-          lnk.href = 'https://www.kapsi.fi/';
-          lnk.appendChild(document.createTextNode(lnk.href));
-          settingsDiv.appendChild(lnk);
-          settingsDiv.appendChild(document.createElement("BR"));    
-        }       
-
-        if (atttribution_mapant || atttribution_kapsi) {
-          settingsDiv.appendChild(document.createElement("BR"));
-        }
-
         // Close button
         var settingsCloseButton = document.createElement("BUTTON");
         settingsCloseButton.appendChild(document.createTextNode("Close"));
@@ -804,16 +724,16 @@
         settingsDiv.appendChild(settingsCloseButton);
 
         // Help button
-        var settingsCloseButton = document.createElement("BUTTON");
-        settingsCloseButton.style.marginLeft = '11px'
-        settingsCloseButton.appendChild(document.createTextNode("Help"));
-        settingsCloseButton.onclick = function(){
+        var settingsHelpButton = document.createElement("BUTTON");
+        settingsHelpButton.style.marginLeft = '11px'
+        settingsHelpButton.appendChild(document.createTextNode("Help"));
+        settingsHelpButton.onclick = function(){
           console.log("settingsDiv Help clicked");
           infoWindow.close();
           var contentString = '<div id="content">'+
             '<div id="siteHelp">'+
             '</div>'+
-            '<h1 id="helpHeading" class="helpHeading">Url parameters</h1>'+
+            '<h3 id="helpHeading" class="helpHeading">Url parameters</h3>'+
             '<div id="bodyContent">'+
             '<p>' +
             'kml=url,name[,1]<br> ' +
@@ -833,7 +753,43 @@
           infoWindow.setPosition(map.getCenter());
           infoWindow.open(map);
         };
-        settingsDiv.appendChild(settingsCloseButton);
+        settingsDiv.appendChild(settingsHelpButton);
+
+        // Info button
+        var settingsInfoButton = document.createElement("BUTTON");
+        settingsInfoButton.style.marginLeft = '11px'
+        settingsInfoButton.appendChild(document.createTextNode("Info"));
+        settingsInfoButton.onclick = function(){
+          console.log("settingsDiv Info clicked");
+          infoWindow.close();
+          var contentString = '<div id="content">'+
+            '<div id="siteInfo">'+
+            '</div>'+
+            '<h3 id="infoHeading" class="infoHeading">Attribution</h3>'+
+            '<div id="bodyContent">'+
+            '<p>' +
+            'Roadmap and satellite images from Google.' +
+            '</p><p>' +
+            'Topography maps and aerial images:<br>' +
+            '<a href=http://www.maanmittauslaitos.fi/>http://www.maanmittauslaitos.fi/</a>' +
+            '</p><p>' +            
+            'Maastokartat and ortoilmakuvat hosted by:<br>' +            
+            '<a href=https://www.kapsi.fi/>https://www.kapsi.fi/</a>' +
+            '</p><p>' +            
+            'MapAnt maps created and hosted by:<br>' +                       
+            '<a href=http://www.mapant.fi/>http://www.mapant.fi/</a>' +
+            '</p><p>' +            
+            'Maps for Old maps layer are from book:<br>' + 
+            'Pekka Silvast, 1991. Porkkala 1944–1956 - Neuvostoliiton merisotilaallinen tukikohta. Tutkimusraportti, Sotamuseo 1/1991.' +
+            '</p></p> ' +
+            '</div>'+
+            '</div>';
+          infoWindow.setContent(contentString);
+          infoWindow.setPosition(map.getCenter());
+          infoWindow.open(map);
+        };
+        settingsDiv.appendChild(settingsInfoButton);
+        
 
         // ------------------------------------------------------------
         // initMap: Crosshair to show the map center
