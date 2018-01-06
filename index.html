@@ -46,7 +46,7 @@
       var layerDialogDiv;
       var settingsDiv;
       var coordinatesBox;
-      var kmlVersion = 4;
+      var kmlVersion = 5;
       var mapInfoTextDiv;
       var layers = [
                       { name : 'Lynx',  visible : false,  type : 'kml', 
@@ -770,7 +770,7 @@
             '<p>' +
             'Roadmap and satellite images from Google.' +
             '</p><p>' +
-            'Topography maps and aerial images:<br>' +
+            'Topography maps and aerial images from Maanmittauslaitos:<br>' +
             '<a href=http://www.maanmittauslaitos.fi/>http://www.maanmittauslaitos.fi/</a>' +
             '</p><p>' +            
             'Maastokartat and ortoilmakuvat hosted by:<br>' +            
@@ -782,6 +782,20 @@
             'Maps for Old maps layer are from book:<br>' + 
             'Pekka Silvast, 1991. Porkkala 1944–1956 - Neuvostoliiton merisotilaallinen tukikohta. Tutkimusraportti, Sotamuseo 1/1991.' +
             '</p></p> ' +
+            'Lynx layer data created by Kirkkonummi Orienteering Club Lynx:<br>' +
+            '<a href=http://www.lynx.fi/index.php/parenteesi-suunnistuskartalle>Paranteesi suunnistuskartalle</a>' +
+            '</p><p>' +
+            'Muinaisjäännökset layer data from Museovirasto:<br>' +
+            '<a href=http://www.nba.fi>Museovirasto</a>' +
+            '</p></p> ' +
+            'Muinaisjäännökset layer data in Google Fusion Tables found from:<br>' +
+            '<a href=http://fba.evvk.com/geo/kulttuuriymparisto>Muinaisjäännökset Suomessa</a>' +
+            '</p></p> ' + 
+            'Planetskier layer data from:<br>' +
+            '<a href=http://planetskier.blogspot.fi/>Planetskier</a>' +
+            '</p></p> ' +          
+            'Jarmo layer data is from my own trips around Espoo, Finland.<br>' +
+            '</p></p> ' +     
             '</div>'+
             '</div>';
           infoWindow.setContent(contentString);
