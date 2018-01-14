@@ -46,13 +46,19 @@
       var layerDialogDiv;
       var settingsDiv;
       var coordinatesBox;
-      var kmlVersion = 5;
+      var kmlVersion = 6;
       var mapInfoTextDiv;
       var layers = [
                       { name : 'Lynx',  visible : false,  type : 'kml', 
                         url : 'https://ruuth.xyz/Lynx.kmz', 
                         layer : null 
                       },
+                      { name : 'Paranteesipisteet', visible : false, type : 'kml', 
+                        url : 'https://ruuth.xyz/ParanteesiKirja.kmz', 
+                        layer : null },
+                      { name : 'Paranteesikartat', visible : false, type : 'oldmaps', 
+                        url : null, 
+                        layer : null },    // Array of overlay layers
                       { name : 'Muinaisjäännökset', visible : false, type : 'fusion',  
                         col : '\'sijainti\'', tab : '1BTqOeSzHYH_ub8-ef_BbUvP-s89VjEdfvtyKVMk', 
                         layer : null 
@@ -64,10 +70,7 @@
                       { name : 'Jarmo', visible : false, type : 'kml', 
                         url : 'https://ruuth.xyz/EspoonLahiretkia.kml', 
                         layer : null 
-                      },
-                      { name : 'Old maps', visible : false, type : 'oldmaps', 
-                        url : null, 
-                        layer : null }    // Array of overlay layers                    
+                      }
                    ];
       var maps = [
                       { name : 'peruskartta', altname : 'kapsi', visible : true
@@ -779,7 +782,7 @@
             'MapAnt maps created and hosted by:<br>' +                       
             '<a href=http://www.mapant.fi/>http://www.mapant.fi/</a>' +
             '</p><p>' +            
-            'Maps for Old maps layer are from book:<br>' + 
+            'Maps for Paranteesikartat layer are from book:<br>' + 
             'Pekka Silvast, 1991. Porkkala 1944–1956 - Neuvostoliiton merisotilaallinen tukikohta. Tutkimusraportti, Sotamuseo 1/1991.' +
             '</p></p> ' +
             'Lynx layer data created by Kirkkonummi Orienteering Club Lynx:<br>' +
@@ -796,6 +799,8 @@
             '</p></p> ' +          
             'Jarmo layer data is from my own trips around Espoo, Finland.<br>' +
             '</p></p> ' +     
+            'Paranteesipisteet data is from Paranteesikartat layer maps and other sources.<br>' +
+            '</p></p> ' +             
             '</div>'+
             '</div>';
           infoWindow.setContent(contentString);
