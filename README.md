@@ -25,5 +25,37 @@ The current map state is stored into HTML5 session storage while jumping between
 
 Using HTML5 geolocation API on mobile devices like Chrome on Android requires that page is loaded from https source. There are many alternatives to create a web server that support https. I used Caddy and it was very easy to get started.
 
-Example of multiple configuration parameters from url: 
-https://test.net/map.html?kml=http://info.net/points.kmz,MyPoints&path=1000&kml=http://info.net/points2.kmz,MyPoints2
+Short description of available layers:
+
+Lynx parenteesi
+
+- Kirkkonummi orienteering club maintained map of Soviet rental era bunkers and other remains.
+
+Parenteesipisteet
+
+- Locations of Soviet rental era bunkers and other remains found from book: 'Pekka Silvast, 1991. Porkkala 1944–1956 - Neuvostoliiton merisotilaallinen tukikohta. Tutkimusraportti, Sotamuseo 1/1991.'
+- Approximate color coding for points in this layer is:
+  Blue - not visited 
+  Green - visited, some has pictures
+  Gray - visited but found nothing
+  Black - not possible/difficult to check
+- Special markings
+  House - a big bunker
+  Square around round bullet - border control point
+
+Parenteesikartat
+
+- Map images from Pekka Silvast book as on overlay on top of current map.
+
+Muinaisjäännökset
+
+- Muinaisjäännökset layer data in Google Fusion Tables found from http://fba.evvk.com/geo/kulttuuriymparisto. Actual data in there is from Museovirasto.
+
+Planetskier
+
+- Planetskier data around the globe from http://planetskier.blogspot.fi/
+
+Espoon lähiretkiä
+
+- Interesting locations I have visited around Espoo.
+- More details and color coding as a Google My Maps can be found from https://drive.google.com/open?id=1HQg6K5qyvEE7ql1kCAjDxeHWe_Fuz9QV&usp=sharing
