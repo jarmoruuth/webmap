@@ -34,14 +34,8 @@ Lynx parenteesi
 Parenteesipisteet
 
 - Locations of Soviet rental era bunkers and other remains found from book: 'Pekka Silvast, 1991. Porkkala 1944–1956 - Neuvostoliiton merisotilaallinen tukikohta. Tutkimusraportti, Sotamuseo 1/1991.'
-- Approximate color coding for points in this layer is:
-  Blue - not visited 
-  Green - visited, some has pictures
-  Gray - visited but found nothing
-  Black - not possible/difficult to check
-- Special markings
-  House - a big bunker
-  Square around round bullet - border control point
+- Approximate color coding for points in this layer is: Blue - not visited, Green - visited, Gray - visited but found nothing, Black - not possible/difficult to check
+- Special markings: House - a big bunker, Square inside a round bullet - border control point
 
 Parenteesikartat
 
