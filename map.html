@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>map 0.33</title>
+    <title>map 0.34</title>
     <link rel="icon" type="image/png" sizes="16x16" href="map-favicon.png">
     <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
     <meta charset="utf-8">
@@ -31,7 +31,6 @@
       var id, infoWindow, marker, options;
       var nbasemaps;
       var current_location = {lat: 60.2053791, lng: 24.6540694};          // Espoo
-      //var current_location = {lat: 60.124932, lng: 24.439290};    // Kirkkonummi
       var autoMove = true;
       var path = [];                // path of last positions
       var maxpath = 10;             // max path points to save
@@ -60,10 +59,6 @@
                       { name : 'Parenteesikartat', visible : false, type : 'oldmaps', 
                         url : null, 
                         layer : null },    // Array of overlay layers
-                      { name : 'Muinaisjäännökset', visible : false, type : 'fusion',  
-                        col : '\'sijainti\'', tab : '1BTqOeSzHYH_ub8-ef_BbUvP-s89VjEdfvtyKVMk', 
-                        layer : null 
-                      },
                       { name : 'Planetskier', visible : false, type : 'kml', 
                         url : 'https://planetskier.net/locations.kmz', 
                         layer : null 
@@ -151,34 +146,6 @@
           layers[layers.length] = newlayer;
         } else {
           console.log('new kml layer needs url and name, newvalues=', newvalues);            
-        }
-      }
-
-      // check fusion table parameters for a new layers
-      // fusion=<column>,<table<>,<name>[,<visible if != 0>]
-      //
-      var fusionparams = searchParams.getAll('fusion');
-      for (var i = 0; i < fusionparams.length; i++) {
-        var fusion = fusionparams[i];
-        console.log('fusion param['+i+']='+fusion);
-        var newlayer = {};
-        var newvalues = fusion.split(',');
-        console.log('newvalues=', newvalues);
-        if (newvalues[0] && newvalues[1]) {
-          console.log('add new fusion layer, newvalues=', newvalues);
-          newlayer.type = 'fusion';
-          newlayer.col = newvalues[0];
-          newlayer.tab = newvalues[1];
-          newlayer.name = newvalues[2];
-          if (newvalues[3]) {
-            newlayer.visible = restoreBool(newvalues[3]);
-          } else {
-            newlayer.visible = false;
-          }
-          newlayer.layer = null;
-          layers[layers.length] = newlayer;
-        } else {
-          console.log('new fusion layer needs column, table and name, newvalues=', newvalues);
         }
       }
 
@@ -437,14 +404,6 @@
                 preserveViewport: true,
                 suppressInfoWindows: false
             });
-          } else if (layer.type == 'fusion') {
-            console.log("loadLayer:create new fusion layer, layer=", layer.name);            
-            layer.layer = new google.maps.FusionTablesLayer({
-              query: {
-                select: layer.col,
-                from: layer.tab
-              }
-            });            
           } else if (layer.type == 'oldmaps') {
             layer.layer = [];
             for (var i = 0; i < overlayMaps.length; i++) {
@@ -741,14 +700,13 @@
             '<div id="bodyContent">'+
             '<p>' +
             'kml=url,name[,1]<br> ' +
-            'fusion=column,table,name[,1]<br> ' +
             'path=maxdots[,interval sec[,min distance meters]]<br> ' +
             'center=lat,lng[,label]<br> ' +
             'marker=lat,lng[,label]<br> ' +
             'layers=name[,name...]<br> ' +
             'maps=name[,name...]<br>' + 
             '</p> ' +
-            '<p>Url can have multiple kml, fusion and marker parameters.<br>' +
+            '<p>Url can have multiple kml and marker parameters.<br>' +
             'Possible maps are peruskartta, ortokuvat and mapant.'
             '</p>' +
             '</div>'+
@@ -777,7 +735,7 @@
             'Topography maps and aerial images from Maanmittauslaitos:<br>' +
             '<a href=http://www.maanmittauslaitos.fi/>http://www.maanmittauslaitos.fi/</a>' +
             '</p><p>' +            
-            'Maastokartat and ortoilmakuvat hosted by:<br>' +            
+            'Ortoilmakuvat hosted by:<br>' +            
             '<a href=https://www.kapsi.fi/>https://www.kapsi.fi/</a>' +
             '</p><p>' +            
             'MapAnt maps created and hosted by:<br>' +                       
@@ -789,12 +747,6 @@
             'Lynx layer data created by Kirkkonummi Orienteering Club Lynx:<br>' +
             '<a href=http://www.lynx.fi/index.php/parenteesi-suunnistuskartalle>Parenteesi suunnistuskartalle</a>' +
             '</p><p>' +
-            'Muinaisjäännökset layer data from Museovirasto:<br>' +
-            '<a href=http://www.nba.fi>Museovirasto</a>' +
-            '</p></p> ' +
-            'Muinaisjäännökset layer data in Google Fusion Tables found from:<br>' +
-            '<a href=http://fba.evvk.com/geo/kulttuuriymparisto>Muinaisjäännökset Suomessa</a>' +
-            '</p></p> ' + 
             'Planetskier layer data from:<br>' +
             '<a href=http://planetskier.blogspot.fi/>Planetskier</a>' +
             '</p></p> ' +          
@@ -828,13 +780,13 @@
 
         var perusMapType = new google.maps.ImageMapType({
           getTileUrl: function(coord, zoom) {
-              var url =  "http://tiles.kartat.kapsi.fi/peruskartta/" + zoom + "/" + 
-                coord.x + "/" + coord.y + ".jpg";
+            var url =  "http://avoin-karttakuva.maanmittauslaitos.fi/avoin/wmts/1.0.0/maastokartta/default/WGS84_Pseudo-Mercator/" + zoom + "/" + 
+                coord.y + "/" + coord.x + ".png";
               //console.log('Peruskartta url='+url);
               return url;
           },
           tileSize: new google.maps.Size(256, 256),
-          maxZoom: 19,
+          maxZoom: 18,
           minZoom: 0,
           name: 'Peruskartta'
         });
@@ -847,7 +799,7 @@
         var ortoMapType = new google.maps.ImageMapType({
           getTileUrl: function(coord, zoom) {
               var url = "http://tiles.kartat.kapsi.fi/ortokuva/" + zoom + "/" + 
-                coord.x + "/" + coord.y + ".jpg";
+                coord.x + "/" + coord.y + ".png";
               //console.log('Ortokuvat url='+url);
               return url;
           },
@@ -1020,7 +972,7 @@
         map.addListener('maptypeid_changed', function() {
           var showStreetViewControl = true;
           if (map.getMapTypeId() == 'peruskartta') {
-            mapInfoTextDiv.innerHTML = 'Maanmittauslaitos, Kapsi';
+            mapInfoTextDiv.innerHTML = 'Maanmittauslaitos';
             showStreetViewControl = false;
           } else if (map.getMapTypeId() == 'ortokuvat') {
             mapInfoTextDiv.innerHTML = 'Maanmittauslaitos, Kapsi';
