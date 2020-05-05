@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>map 0.34</title>
+    <title>map 0.35</title>
     <link rel="icon" type="image/png" sizes="16x16" href="map-favicon.png">
     <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
     <meta charset="utf-8">
@@ -22,13 +22,13 @@
   </head>
   <body>
     <div id="map"></div>
-    <script>
+    <script charset="UTF-8">
       // Note: This example requires that you consent to location sharing when
       // prompted by your browser. If you see the error "The Geolocation service
       // failed.", it means you probably did not give permission for the browser to
       // locate you.
       var map;
-      var id, infoWindow, marker, options;
+      var id, infoWindow, infoPopup, marker, options;
       var nbasemaps;
       var current_location = {lat: 60.2053791, lng: 24.6540694};          // Espoo
       var autoMove = true;
@@ -48,6 +48,7 @@
       var coordinatesBox;
       var kmlVersion = 6;
       var mapInfoTextDiv;
+      var use_kapsi_maastokartat = false;
       var layers = [
                       { name : 'Lynx parenteesi',  visible : false,  type : 'kml', 
                         url : 'https://ruuth.xyz/Lynx.kmz', 
@@ -65,6 +66,14 @@
                       },
                       { name : 'Espoon lähiretkiä', visible : false, type : 'kml', 
                         url : 'https://ruuth.xyz/EspoonLahiretkia.kml', 
+                        layer : null 
+                      },
+                      { name : 'Maailmanperintökohteet', visible : false, type : 'kmlarray', 
+                        url : [ 'https://ruuth.xyz/maailmanperinto_kohteet_point.kml', 'https://ruuth.xyz/maailmanperinto_kohteet_region.kml' ],
+                        layer : null
+                      },
+                      { name : 'Muinaisjäännökset', visible : false, type : 'geojson', 
+                        url : '', 
                         layer : null 
                       }
                    ];
@@ -412,7 +421,221 @@
                                                   overlayMaps[i].bounds);
               layer.layer[layer.layer.length] = newOverlay;
             }
+          } else if (layer.type == 'geojson') {
+            console.log("loadLayer:geojson, nothing to do");
+          } else if (layer.type == 'kmlarray') {
+            console.log("loadLayer:create new kml layer, layer=", layer.name);
+            layer.layer = [];
+            for (var i = 0; i < layer.url.length; i++)
+              layer.layer[i] = new google.maps.KmlLayer(layer.url[i], {
+                  preserveViewport: true,
+                  suppressInfoWindows: false
+              });
           }
+        }
+      }
+
+      // ------------------------------------------------------------
+      // Geojson layer show/hide
+
+      var geojson_tilenames = [];
+      var geojson_visible = false;
+      var geojson_listener = null;
+      var geojson_bounds_changed = false;
+      var geojson_zoom = 12;
+
+      function fix_order(arr2) {
+          if (arr2[0] > arr2[1]) {
+            return [arr2[1], arr2[0]];
+          } else {
+            return arr2;
+          }
+      }
+
+      function cleanupProperty(prop) {
+        if (prop != undefined) {
+          prop = prop.toString().trim();
+          if(prop.charAt(prop.length-1) == ",") {
+            prop = prop.slice(0, -1)
+          }
+        }
+        return prop;
+      }
+
+      function getGeojsonHtml(feat, name) {
+        var prop = cleanupProperty(feat.getProperty(name));
+        if (prop == undefined) {
+          return "";
+        }
+        if (name == "Mjtunnus") {
+          name = "More info";
+          prop = "<a href=https://www.kyppi.fi/palveluikkuna/mjreki/read/asp/r_kohde_det.aspx?KOHDE_ID="+prop+">Museovirasto</a>"
+        }
+        return "<tr><td>" + name + "</td><td>" + prop + "</td></tr>";
+      }
+
+      // Tile functions from:
+      // https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames
+      function long2tile(lon,zoom) { return (Math.floor((lon+180)/360*Math.pow(2,zoom))); }
+      function lat2tile(lat,zoom)  { return (Math.floor((1-Math.log(Math.tan(lat*Math.PI/180) + 1/Math.cos(lat*Math.PI/180))/Math.PI)/2 *Math.pow(2,zoom))); }
+
+      function showGeojsonLayer() {
+        
+        geojson_visible = true;
+
+        if (!geojson_bounds_changed) {
+          console.log("showGeojsonLayer:!geojson_bounds_changed");
+          return;
+        }
+
+        // calculate tiles
+        console.log("showGeojsonLayer:calculate tiles");
+        if (typeof map.getBounds !== 'function') {
+          console.log("showGeojsonLayer:map.getBounds not available");
+          return;
+        }
+        var bounds = map.getBounds();
+        //console.log("showGeojsonLayer:bounds", bounds.getNorthEast().lat(), bounds.getNorthEast().lng(), bounds.getSouthWest().lat(), bounds.getSouthWest().lng());
+        //console.log("showGeojsonLayer:current_location", current_location, long2tile(current_location.lng, geojson_zoom), lat2tile(current_location.lat, geojson_zoom));
+        var bounds_x = [
+          long2tile(bounds.getNorthEast().lng(), geojson_zoom),
+          long2tile(bounds.getSouthWest().lng(), geojson_zoom)
+        ];
+        var bounds_y = [
+          lat2tile(bounds.getNorthEast().lat(), geojson_zoom),
+          lat2tile(bounds.getSouthWest().lat(), geojson_zoom)
+        ];
+        bounds_x = fix_order(bounds_x);
+        bounds_y = fix_order(bounds_y);
+        bounds_x[1] = bounds_x[1] + 1;
+        bounds_y[1] = bounds_y[1] + 1;
+        console.log("showGeojsonLayer:bounds_x", bounds_x, "bounds_y", bounds_y);
+        var new_tiles = [];
+        var new_tile_xy = [];
+        for (var x = bounds_x[0]; x < bounds_x[1]; x++) {
+          for (var y = bounds_y[0]; y < bounds_y[1]; y++) {
+            //console.log("showGeojsonLayer:x", x, "y", y);
+            new_tiles[new_tiles.length] = x.toString() + '_' + y.toString();
+            new_tile_xy[new_tile_xy.length] = [x, y];
+            //console.log("showGeojsonLayer:tile", new_tiles[new_tiles.length-1]);
+          }
+        }
+        console.log("showGeojsonLayer:new_tiles", new_tiles);
+
+        // find tiles that need to be loaded and tiles
+        // that can be removed
+        //console.log("showGeojsonLayer:show new tiles", new_tiles.length);
+        for (var i = 0; i < new_tiles.length; i++) {
+          var found_tile = false;
+          for (var j = 0; j < geojson_tilenames.length; j++) {
+            if (geojson_tilenames[j] == new_tiles[i]) {
+              // tile is already visible, set it to null
+              // so we do not remove it
+              console.log("showGeojsonLayer:visible tile", new_tiles[i]);
+              geojson_tilenames[j] = '';
+              found_tile = true;
+              break;
+            }
+          }
+          if (!found_tile) {
+            console.log("showGeojsonLayer:load tile " + new_tiles[i]);
+            var xy = new_tile_xy[i];
+            var url = 'https://ruuth.xyz/tiles/' + xy[0].toString() + '/tile_' + xy[1].toString() + '.geojson';
+            console.log("showGeojsonLayer:load tile " + new_tiles[i] + " url " + url);
+            map.data.loadGeoJson(url);
+          }
+        }
+        console.log("showGeojsonLayer:old geojson_tilenames", geojson_tilenames);
+        
+        // remove those tiles that are not part of current view
+        console.log("showGeojsonLayer:remove out-of-area tiles", geojson_tilenames.length);
+        for (var j = 0; j < geojson_tilenames.length; j++) {
+          if (geojson_tilenames[j] != '') {
+            //console.log("showGeojsonLayer:check for remove tile " + geojson_tilenames[j]);
+            map.data.forEach(function (feature) {
+              tilename = feature.getProperty('tile');
+              //console.log("showGeojsonLayer:feature tile " + tilename);
+              if (tilename == geojson_tilenames[j]) {
+                //console.log("showGeojsonLayer:remove tile " + tilename);
+                map.data.remove(feature);
+              }
+            });
+          }
+        }
+        geojson_tilenames = new_tiles;
+        if (geojson_listener == null) {
+          geojson_listener = map.data.addListener('click', function(event) {
+                              var feat = event.feature;
+                              var html = "<table>" +
+                                          getGeojsonHtml(feat, "Kohdenimi") +
+                                          getGeojsonHtml(feat, "Ajoitus") +
+                                          getGeojsonHtml(feat, "Tyyppi") +
+                                          getGeojsonHtml(feat, "Alatyyppi") +
+                                          getGeojsonHtml(feat, "Laji") +
+                                          getGeojsonHtml(feat, "Tuhoutunut") +
+                                          getGeojsonHtml(feat, "Luontipvm") +
+                                          getGeojsonHtml(feat, "Muutospvm") +
+                                          getGeojsonHtml(feat, "Vedenalain") +
+                                          getGeojsonHtml(feat, "Mjtunnus") +
+                                          "</table>";
+                              infoPopup.close();
+                              infoWindow.close();
+                              infoWindow.setContent(html);
+                              infoWindow.setPosition(event.latLng);
+                              infoWindow.setOptions({pixelOffset: new google.maps.Size(0,-34)});
+                              infoWindow.open(map);
+                            });
+          // Set mouseover event for each feature.
+          map.data.addListener('mouseover', function(event) {
+            var infostr = cleanupProperty(event.feature.getProperty('Tyyppi'));
+            if (infostr == undefined) {
+              infostr = cleanupProperty(event.feature.getProperty('Kohdenimi'));
+            } else {
+              var alatyyppi = cleanupProperty(event.feature.getProperty('Alatyyppi'));
+              if (alatyyppi != undefined) {
+                infostr = infostr + ', ' + alatyyppi;
+              }
+            }
+            if (infostr == undefined) {
+              infostr = "No info";
+            }
+            infoPopup.close();
+            infoPopup.setContent(infostr);
+            infoPopup.setPosition(event.latLng);
+            infoPopup.setOptions({pixelOffset: new google.maps.Size(0,-34)});
+            infoPopup.open(map);
+          });
+        }
+        map.data.addListener('mouseout', function(event) {
+          infoPopup.close();
+        });
+        console.log("showGeojsonLayer:done");
+      }
+
+      function hideGeojsonLayer() {
+        console.log("hideGeojsonLayer");
+        map.data.forEach(function (feature) {
+          map.data.remove(feature);
+        });
+        geojson_tilenames = [];
+        geojson_visible = false;
+      }
+
+      function updateGeojsonLayer() {
+        console.log("updateGeojsonLayer");
+        geojson_bounds_changed = true;
+        if (!geojson_visible) {
+          console.log("updateGeojsonLayer:not visible");
+          return;
+        }
+        console.log('map.getZoom()', map.getZoom(),  'geojson_zoom', geojson_zoom);
+        if (map.getZoom() >= 13) {
+          showGeojsonLayer();
+        } else {
+          // if we zoom out too much do not show 
+          // geojson points
+          //hideGeojsonLayer();
+          geojson_visible = true;
         }
       }
 
@@ -427,8 +650,14 @@
               for (var i = 0; i< layer.layer.length; i++) {
                 layer.layer[i].setMap(map);
               }            
-            } else {
+            } else if (layer.type == 'kml') {
               layer.layer.setMap(map);
+            } else if (layer.type == 'kmlarray') {
+              for (var i = 0; i < layer.layer.length; i++) {
+                layer.layer[i].setMap(map);
+              }
+            } else if (layer.type == 'geojson') {
+              showGeojsonLayer();
             }
           }
       }
@@ -440,8 +669,14 @@
               for (var i = 0; i < layer.layer.length; i++) {
                 layer.layer[i].setMap(null);
               }            
-            } else {
+            } else if (layer.type == 'kml') {
               layer.layer.setMap(null);
+            } else if (layer.type == 'kmlarray') {
+              for (var i = 0; i < layer.layer.length; i++) {
+                layer.layer[i].setMap(null);
+              }
+            } else if (layer.type == 'geojson') {
+              hideGeojsonLayer();
             }
           }
       }
@@ -515,6 +750,21 @@
           }
         });
 
+        // Geojson marker style
+        /* Default style is kind of good...
+        map.data.setStyle(function(feature) {
+          return({
+            icon: {
+              path: google.maps.SymbolPath.CIRCLE,
+              scale: 4,
+              fillColor: '#f00',
+              fillOpacity: 0.5,
+              strokeWeight: 1
+            }
+          });
+        });
+        */
+
         nbasemaps = map.mapTypeControlOptions.mapTypeIds.length;
         setVisibleMaps();
 
@@ -532,6 +782,10 @@
             map.mapTypeControlOptions.mapTypeIds[i] = null;
           }
         }
+
+        map.addListener('bounds_changed', function() {
+          updateGeojsonLayer();
+        });
 
         // initMap: show markers listed in url
 
@@ -577,6 +831,7 @@
         layerCloseButton.onclick = function(){
           console.log("layerDialog Close clicked");
           infoWindow.close();
+          infoPopup.close();
         };
         layerDialogDiv.appendChild(layerCloseButton);
 
@@ -645,6 +900,21 @@
         settingsDiv.appendChild(checkBox);
         settingsDiv.appendChild(document.createTextNode('Force KML refresh'));
         settingsDiv.appendChild(document.createElement("BR")); 
+
+        // Create check box for Kapsi maastokartat
+        checkBox = document.createElement("INPUT");
+        checkBox.setAttribute("type", "checkbox");
+        checkBox.value = 'Maastokartat from Kapsi';
+        checkBox.checked = use_kapsi_maastokartat;
+        checkBox.onclick = function() {
+          use_kapsi_maastokartat = this.checked;
+          console.log("settingsDiv clicked, name=" + this.value + ",checked=", this.checked);
+        };
+        settingsDiv.appendChild(checkBox);
+        settingsDiv.appendChild(document.createTextNode('Maastokartat from Kapsi'));
+        settingsDiv.appendChild(document.createElement("BR")); 
+
+        // extra line break
         settingsDiv.appendChild(document.createElement("BR"));
         
         var atttribution_kapsi = false;
@@ -683,6 +953,7 @@
           }
           //setVisibleMaps();
           infoWindow.close();
+          infoPopup.close();
         };
         settingsDiv.appendChild(settingsCloseButton);
 
@@ -693,6 +964,7 @@
         settingsHelpButton.onclick = function(){
           console.log("settingsDiv Help clicked");
           infoWindow.close();
+          infoPopup.close();
           var contentString = '<div id="content">'+
             '<div id="siteHelp">'+
             '</div>'+
@@ -711,6 +983,7 @@
             '</p>' +
             '</div>'+
             '</div>';
+          infoPopup.close();
           infoWindow.setContent(contentString);
           infoWindow.setPosition(map.getCenter());
           infoWindow.open(map);
@@ -723,6 +996,7 @@
         settingsInfoButton.appendChild(document.createTextNode("Info"));
         settingsInfoButton.onclick = function(){
           console.log("settingsDiv Info clicked");
+          infoPopup.close();
           infoWindow.close();
           var contentString = '<div id="content">'+
             '<div id="siteInfo">'+
@@ -735,7 +1009,7 @@
             'Topography maps and aerial images from Maanmittauslaitos:<br>' +
             '<a href=http://www.maanmittauslaitos.fi/>http://www.maanmittauslaitos.fi/</a>' +
             '</p><p>' +            
-            'Ortoilmakuvat hosted by:<br>' +            
+            'Ortoilmakuvat and optionally Maastokartat hosted by:<br>' +            
             '<a href=https://www.kapsi.fi/>https://www.kapsi.fi/</a>' +
             '</p><p>' +            
             'MapAnt maps created and hosted by:<br>' +                       
@@ -747,6 +1021,9 @@
             'Lynx layer data created by Kirkkonummi Orienteering Club Lynx:<br>' +
             '<a href=http://www.lynx.fi/index.php/parenteesi-suunnistuskartalle>Parenteesi suunnistuskartalle</a>' +
             '</p><p>' +
+            'Muinaisjäännökset and Maailmaperintökohteet data from Museovirasto:<br>' +
+            '<a href=http://www.museovirasto.fi>Museovirasto</a>' +
+            '</p></p> ' +            
             'Planetskier layer data from:<br>' +
             '<a href=http://planetskier.blogspot.fi/>Planetskier</a>' +
             '</p></p> ' +          
@@ -756,6 +1033,7 @@
             '</p></p> ' +             
             '</div>'+
             '</div>';
+          infoPopup.close();
           infoWindow.setContent(contentString);
           infoWindow.setPosition(map.getCenter());
           infoWindow.open(map);
@@ -780,10 +1058,16 @@
 
         var perusMapType = new google.maps.ImageMapType({
           getTileUrl: function(coord, zoom) {
-            var url =  "http://avoin-karttakuva.maanmittauslaitos.fi/avoin/wmts/1.0.0/maastokartta/default/WGS84_Pseudo-Mercator/" + zoom + "/" + 
-                coord.y + "/" + coord.x + ".png";
-              //console.log('Peruskartta url='+url);
-              return url;
+            if (use_kapsi_maastokartat) {
+                var url =  "http://tiles.kartat.kapsi.fi/peruskartta/" + zoom + "/" + 
+                  coord.x + "/" + coord.y + ".jpg";
+                return url;
+            } else {
+              var url =  "http://avoin-karttakuva.maanmittauslaitos.fi/avoin/wmts/1.0.0/maastokartta/default/WGS84_Pseudo-Mercator/" + zoom + "/" + 
+                  coord.y + "/" + coord.x + ".png";
+                //console.log('Peruskartta url='+url);
+                return url;
+            }
           },
           tileSize: new google.maps.Size(256, 256),
           maxZoom: 18,
@@ -833,6 +1117,7 @@
 
         marker = null;
         infoWindow = new google.maps.InfoWindow;
+        infoPopup = new google.maps.InfoWindow;
 
         function setDivStyle(div) {
           div.style.backgroundColor = '#fff';
@@ -920,6 +1205,7 @@
         layersButton.src = 'https://ruuth.xyz/ic_layers_black_24px.svg';
         layersButton.addEventListener('click', function() {
           console.log("click Layer, layerDialogDiv");
+          infoPopup.close();
           infoWindow.close();
           infoWindow.setContent(layerDialogDiv);
           infoWindow.setPosition(map.getCenter());
@@ -941,6 +1227,7 @@
           var map_center = map.getCenter();
           coordinatesBox.value = String(map_center.lat())+','+String(map_center.lng());
           coordinatesBox.defaultValue = coordinatesBox.value;
+          infoPopup.close();
           infoWindow.close();
           infoWindow.setContent(settingsDiv);
           infoWindow.setPosition(map_center);
@@ -960,6 +1247,7 @@
                                 'Error: The Geolocation service failed.' :
                                 'Error: Your browser doesn\'t support geolocation.';
           console.log(msg);
+          infoPopup.close();
           infoWindow.close();
           infoWindow.setPosition(pos);
           infoWindow.setContent(msg);
@@ -972,7 +1260,11 @@
         map.addListener('maptypeid_changed', function() {
           var showStreetViewControl = true;
           if (map.getMapTypeId() == 'peruskartta') {
-            mapInfoTextDiv.innerHTML = 'Maanmittauslaitos';
+            if (use_kapsi_maastokartat) {
+              mapInfoTextDiv.innerHTML = 'Maanmittauslaitos, Kapsi';
+            } else {
+              mapInfoTextDiv.innerHTML = 'Maanmittauslaitos';
+            }
             showStreetViewControl = false;
           } else if (map.getMapTypeId() == 'ortokuvat') {
             mapInfoTextDiv.innerHTML = 'Maanmittauslaitos, Kapsi';
@@ -1058,6 +1350,7 @@
                 });
                 // click the marker to get coordinates
                 marker.addListener('click', function() {
+                    infoPopup.close();
                     infoWindow.close();
                     infoWindow.setPosition(current_location);
                     infoWindow.setContent('Lat: ' + current_location.lat + ' Lng: ' + current_location.lng);
@@ -1073,6 +1366,7 @@
       // Error function for position change watch
 
       function watchError(err) {
+        infoPopup.close();
         infoWindow.close();
         infoWindow.setPosition(pos);
         infoWindow.setContent('Watch Error(' + err.code + '): ' + err.message);
