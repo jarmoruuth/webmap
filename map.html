@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>map 0.35</title>
+    <title>map 0.36</title>
     <link rel="icon" type="image/png" sizes="16x16" href="map-favicon.png">
     <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
     <meta charset="utf-8">
@@ -72,10 +72,26 @@
                         url : [ 'https://ruuth.xyz/maailmanperinto_kohteet_point.kml', 'https://ruuth.xyz/maailmanperinto_kohteet_region.kml' ],
                         layer : null
                       },
-                      { name : 'Muinaisjäännökset', visible : false, type : 'geojson', 
+                      { name : 'Muinaisjäännökset', visible : false, type : 'tiled_geojson', 
                         url : '', 
                         layer : null 
-                      }
+                      },
+                      { name : 'Luolanimistö', visible : false, type : 'kml', 
+                        url : 'https://ruuth.xyz/Luolanimet.kml', 
+                        layer : null 
+                      },
+                      { name : 'Mielenkiintoiset nimet 1 (kirkko, kellari, kolo)', visible : false, type : 'kml', 
+                        url : 'https://ruuth.xyz/kirkko_kellari_kolo.kml', 
+                        layer : null 
+                      },
+                      { name : 'Mielenkiintoiset nimet 2 (piru, hiiden, kasaberget)', visible : false, type : 'kml', 
+                        url : 'https://ruuth.xyz/piru_hiiden_kasaberget.kml', 
+                        layer : null 
+                      },
+                      { name : 'Luolaseuran luolat', visible : false, type : 'activityjson', 
+                        url : 'https://ruuth.xyz/caves.luolaseura.json', 
+                        layer : null 
+                      },
                    ];
       var maps = [
                       { name : 'peruskartta', altname : 'kapsi', visible : true
@@ -401,7 +417,9 @@
       // load layer
 
       function loadLayer(layer) {
+
         if (!layer.layer) {
+
           if (layer.type == 'kml') {
             console.log("loadLayer:create new kml layer, layer=", layer.name);
             var layerUrl = layer.url;
@@ -409,11 +427,18 @@
               layerUrl += '?ver=' + kmlVersion;
               console.log("loadLayer:layer url with version=", layerUrl);
             }
-            layer.layer = new google.maps.KmlLayer(layerUrl, {
-                preserveViewport: true,
-                suppressInfoWindows: false
-            });
+            try {
+              layer.layer = new google.maps.KmlLayer(layerUrl, {
+                  preserveViewport: true,
+                  suppressInfoWindows: false,
+                  map: map
+              });
+            } catch (error) {
+              console.log(error.message);
+            }
+
           } else if (layer.type == 'oldmaps') {
+            console.log("loadLayer:create new oldmaps layer, layer=", layer.name);
             layer.layer = [];
             for (var i = 0; i < overlayMaps.length; i++) {
               var newOverlay = new google.maps.GroundOverlay(
@@ -421,28 +446,107 @@
                                                   overlayMaps[i].bounds);
               layer.layer[layer.layer.length] = newOverlay;
             }
-          } else if (layer.type == 'geojson') {
-            console.log("loadLayer:geojson, nothing to do");
+
+          } else if (layer.type == 'tiled_geojson') {
+            console.log("loadLayer:tiled_geojson, nothing to do");
+
+          } else if (layer.type == 'activityjson') {
+            console.log("loadLayer:ActivityJSON, layer", layer.name);
+            loadActivityJSON(layer);
+            return false;
+
           } else if (layer.type == 'kmlarray') {
-            console.log("loadLayer:create new kml layer, layer=", layer.name);
+            console.log("loadLayer:create new kml array layer, layer=", layer.name);
             layer.layer = [];
             for (var i = 0; i < layer.url.length; i++)
               layer.layer[i] = new google.maps.KmlLayer(layer.url[i], {
                   preserveViewport: true,
                   suppressInfoWindows: false
               });
+          } else {
+            console.log("loadLayer:error, unknown layer, layer=", layer.name);
+          }
+        } else {
+          console.log("loadLayer:layer already loaded, layer=", layer.name);
+        }
+        return true;
+      }
+
+      // ------------------------------------------------------------
+      // ActivityJSON layer load/show/hide
+
+      function addRowActivityJSON(name, value, is_url) {
+        if (value == null || value == undefined)  {
+          return '';
+        }
+        if (is_url) {
+          return "<tr><td>" + name + "</td><td><a href=" + value + ">Kartta</a></td></tr>";
+        } else {
+          return "<tr><td>" + name + "</td><td>" + value + "</td></tr>";
+        }
+      }
+
+      function loadActivityJSON(layer) {
+        console.log('loadActivityJSON:start fetch');
+        fetch(layer.url)
+        .then(response => response.json())
+        .then (json => {
+          console.log('loadActivityJSON:process json');
+          js = json;
+          //console.log('loadActivityJSON:js', js);
+          console.log('loadActivityJSON:js len', js.length);
+          var markers = [];
+          for (var i = 0; i < js.length; i++) {
+            var infotxt = "<table>"+
+                          addRowActivityJSON("Nimi", js[i].n, false) +
+                          addRowActivityJSON("Pituus",  js[i].l, false) +
+                          addRowActivityJSON("Kirjaaja", js[i].rl[0].w, false) +
+                          addRowActivityJSON("Kartta", js[i].m, true) +
+                          "</table>"+
+                          "<br><a href="+js[i].rl[0].u+">Lisätietoja</a>";
+            const marker = new google.maps.Marker({
+                                position: { lat: js[i].lat, lng: js[i].lon },
+                                map: map, 
+                                title: js[i].n,
+                                info: infotxt
+                            });
+            marker.addListener("click", () => {
+              infoWindow.setContent(marker.info);
+              infoWindow.open(map, marker);
+            });
+            markers.push(marker);
+          }
+          console.log('loadActivityJSON:layer elements', markers.length);
+          layer.layer = markers;
+        })
+        .catch (err => console.error(err))
+      }
+
+      function showActivityJSON(layer) {
+        if (layers == null) {
+          console.log('showActivityJSON:null layer');
+        } else {
+          console.log('showActivityJSON:layer elements', layer.length);
+          for (var i = 0; i < layer.length; i++) {
+            layer[i].setMap(map);
           }
         }
       }
 
-      // ------------------------------------------------------------
-      // Geojson layer show/hide
+      function hideActivityJSON(layer) {
+        for (var i = 0; i < layer.length; i++) {
+          layer[i].setMap(null);
+        }
+      }
 
-      var geojson_tilenames = [];
-      var geojson_visible = false;
-      var geojson_listener = null;
-      var geojson_bounds_changed = false;
-      var geojson_zoom = 12;
+      // ------------------------------------------------------------
+      // Tiled Geojson layer show/hide
+
+      var tiled_geojson_tilenames = [];
+      var tiled_geojson_visible = false;
+      var tiled_geojson_listener = null;
+      var tiled_geojson_bounds_changed = false;
+      var tiled_geojson_zoom = 12;
 
       function fix_order(arr2) {
           if (arr2[0] > arr2[1]) {
@@ -462,7 +566,7 @@
         return prop;
       }
 
-      function getGeojsonHtml(feat, name) {
+      function getTiledGeojsonHtml(feat, name) {
         var prop = cleanupProperty(feat.getProperty(name));
         if (prop == undefined) {
           return "";
@@ -479,104 +583,104 @@
       function long2tile(lon,zoom) { return (Math.floor((lon+180)/360*Math.pow(2,zoom))); }
       function lat2tile(lat,zoom)  { return (Math.floor((1-Math.log(Math.tan(lat*Math.PI/180) + 1/Math.cos(lat*Math.PI/180))/Math.PI)/2 *Math.pow(2,zoom))); }
 
-      function showGeojsonLayer() {
+      function showTiledGeojsonLayer() {
         
-        geojson_visible = true;
+        tiled_geojson_visible = true;
 
-        if (!geojson_bounds_changed) {
-          console.log("showGeojsonLayer:!geojson_bounds_changed");
+        if (!tiled_geojson_bounds_changed) {
+          console.log("showTiledGeojsonLayer:!tiled_geojson_bounds_changed");
           return;
         }
 
         // calculate tiles
-        console.log("showGeojsonLayer:calculate tiles");
+        console.log("showTiledGeojsonLayer:calculate tiles");
         if (typeof map.getBounds !== 'function') {
-          console.log("showGeojsonLayer:map.getBounds not available");
+          console.log("showTiledGeojsonLayer:map.getBounds not available");
           return;
         }
         var bounds = map.getBounds();
-        //console.log("showGeojsonLayer:bounds", bounds.getNorthEast().lat(), bounds.getNorthEast().lng(), bounds.getSouthWest().lat(), bounds.getSouthWest().lng());
-        //console.log("showGeojsonLayer:current_location", current_location, long2tile(current_location.lng, geojson_zoom), lat2tile(current_location.lat, geojson_zoom));
+        //console.log("showTiledGeojsonLayer:bounds", bounds.getNorthEast().lat(), bounds.getNorthEast().lng(), bounds.getSouthWest().lat(), bounds.getSouthWest().lng());
+        //console.log("showTiledGeojsonLayer:current_location", current_location, long2tile(current_location.lng, tiled_geojson_zoom), lat2tile(current_location.lat, tiled_geojson_zoom));
         var bounds_x = [
-          long2tile(bounds.getNorthEast().lng(), geojson_zoom),
-          long2tile(bounds.getSouthWest().lng(), geojson_zoom)
+          long2tile(bounds.getNorthEast().lng(), tiled_geojson_zoom),
+          long2tile(bounds.getSouthWest().lng(), tiled_geojson_zoom)
         ];
         var bounds_y = [
-          lat2tile(bounds.getNorthEast().lat(), geojson_zoom),
-          lat2tile(bounds.getSouthWest().lat(), geojson_zoom)
+          lat2tile(bounds.getNorthEast().lat(), tiled_geojson_zoom),
+          lat2tile(bounds.getSouthWest().lat(), tiled_geojson_zoom)
         ];
         bounds_x = fix_order(bounds_x);
         bounds_y = fix_order(bounds_y);
         bounds_x[1] = bounds_x[1] + 1;
         bounds_y[1] = bounds_y[1] + 1;
-        console.log("showGeojsonLayer:bounds_x", bounds_x, "bounds_y", bounds_y);
+        console.log("showTiledGeojsonLayer:bounds_x", bounds_x, "bounds_y", bounds_y);
         var new_tiles = [];
         var new_tile_xy = [];
         for (var x = bounds_x[0]; x < bounds_x[1]; x++) {
           for (var y = bounds_y[0]; y < bounds_y[1]; y++) {
-            //console.log("showGeojsonLayer:x", x, "y", y);
+            //console.log("showTiledGeojsonLayer:x", x, "y", y);
             new_tiles[new_tiles.length] = x.toString() + '_' + y.toString();
             new_tile_xy[new_tile_xy.length] = [x, y];
-            //console.log("showGeojsonLayer:tile", new_tiles[new_tiles.length-1]);
+            //console.log("showTiledGeojsonLayer:tile", new_tiles[new_tiles.length-1]);
           }
         }
-        console.log("showGeojsonLayer:new_tiles", new_tiles);
+        console.log("showTiledGeojsonLayer:new_tiles", new_tiles);
 
         // find tiles that need to be loaded and tiles
         // that can be removed
-        //console.log("showGeojsonLayer:show new tiles", new_tiles.length);
+        //console.log("showTiledGeojsonLayer:show new tiles", new_tiles.length);
         for (var i = 0; i < new_tiles.length; i++) {
           var found_tile = false;
-          for (var j = 0; j < geojson_tilenames.length; j++) {
-            if (geojson_tilenames[j] == new_tiles[i]) {
+          for (var j = 0; j < tiled_geojson_tilenames.length; j++) {
+            if (tiled_geojson_tilenames[j] == new_tiles[i]) {
               // tile is already visible, set it to null
               // so we do not remove it
-              console.log("showGeojsonLayer:visible tile", new_tiles[i]);
-              geojson_tilenames[j] = '';
+              console.log("showTiledGeojsonLayer:visible tile", new_tiles[i]);
+              tiled_geojson_tilenames[j] = '';
               found_tile = true;
               break;
             }
           }
           if (!found_tile) {
-            console.log("showGeojsonLayer:load tile " + new_tiles[i]);
+            console.log("showTiledGeojsonLayer:load tile " + new_tiles[i]);
             var xy = new_tile_xy[i];
             var url = 'https://ruuth.xyz/tiles/' + xy[0].toString() + '/tile_' + xy[1].toString() + '.geojson';
-            console.log("showGeojsonLayer:load tile " + new_tiles[i] + " url " + url);
+            console.log("showTiledGeojsonLayer:load tile " + new_tiles[i] + " url " + url);
             map.data.loadGeoJson(url);
           }
         }
-        console.log("showGeojsonLayer:old geojson_tilenames", geojson_tilenames);
+        console.log("showTiledGeojsonLayer:old tiled_geojson_tilenames", tiled_geojson_tilenames);
         
         // remove those tiles that are not part of current view
-        console.log("showGeojsonLayer:remove out-of-area tiles", geojson_tilenames.length);
-        for (var j = 0; j < geojson_tilenames.length; j++) {
-          if (geojson_tilenames[j] != '') {
-            //console.log("showGeojsonLayer:check for remove tile " + geojson_tilenames[j]);
+        console.log("showTiledGeojsonLayer:remove out-of-area tiles", tiled_geojson_tilenames.length);
+        for (var j = 0; j < tiled_geojson_tilenames.length; j++) {
+          if (tiled_geojson_tilenames[j] != '') {
+            //console.log("showTiledGeojsonLayer:check for remove tile " + tiled_geojson_tilenames[j]);
             map.data.forEach(function (feature) {
               tilename = feature.getProperty('tile');
-              //console.log("showGeojsonLayer:feature tile " + tilename);
-              if (tilename == geojson_tilenames[j]) {
-                //console.log("showGeojsonLayer:remove tile " + tilename);
+              //console.log("showTiledGeojsonLayer:feature tile " + tilename);
+              if (tilename == tiled_geojson_tilenames[j]) {
+                //console.log("showTiledGeojsonLayer:remove tile " + tilename);
                 map.data.remove(feature);
               }
             });
           }
         }
-        geojson_tilenames = new_tiles;
-        if (geojson_listener == null) {
-          geojson_listener = map.data.addListener('click', function(event) {
+        tiled_geojson_tilenames = new_tiles;
+        if (tiled_geojson_listener == null) {
+          tiled_geojson_listener = map.data.addListener('click', function(event) {
                               var feat = event.feature;
                               var html = "<table>" +
-                                          getGeojsonHtml(feat, "Kohdenimi") +
-                                          getGeojsonHtml(feat, "Ajoitus") +
-                                          getGeojsonHtml(feat, "Tyyppi") +
-                                          getGeojsonHtml(feat, "Alatyyppi") +
-                                          getGeojsonHtml(feat, "Laji") +
-                                          getGeojsonHtml(feat, "Tuhoutunut") +
-                                          getGeojsonHtml(feat, "Luontipvm") +
-                                          getGeojsonHtml(feat, "Muutospvm") +
-                                          getGeojsonHtml(feat, "Vedenalain") +
-                                          getGeojsonHtml(feat, "Mjtunnus") +
+                                          getTiledGeojsonHtml(feat, "Kohdenimi") +
+                                          getTiledGeojsonHtml(feat, "Ajoitus") +
+                                          getTiledGeojsonHtml(feat, "Tyyppi") +
+                                          getTiledGeojsonHtml(feat, "Alatyyppi") +
+                                          getTiledGeojsonHtml(feat, "Laji") +
+                                          getTiledGeojsonHtml(feat, "Tuhoutunut") +
+                                          getTiledGeojsonHtml(feat, "Luontipvm") +
+                                          getTiledGeojsonHtml(feat, "Muutospvm") +
+                                          getTiledGeojsonHtml(feat, "Vedenalain") +
+                                          getTiledGeojsonHtml(feat, "Mjtunnus") +
                                           "</table>";
                               infoPopup.close();
                               infoWindow.close();
@@ -609,33 +713,33 @@
         map.data.addListener('mouseout', function(event) {
           infoPopup.close();
         });
-        console.log("showGeojsonLayer:done");
+        console.log("showTiledGeojsonLayer:done");
       }
 
-      function hideGeojsonLayer() {
-        console.log("hideGeojsonLayer");
+      function hideTiledGeojsonLayer() {
+        console.log("hideTiledGeojsonLayer");
         map.data.forEach(function (feature) {
           map.data.remove(feature);
         });
-        geojson_tilenames = [];
-        geojson_visible = false;
+        tiled_geojson_tilenames = [];
+        tiled_geojson_visible = false;
       }
 
-      function updateGeojsonLayer() {
-        console.log("updateGeojsonLayer");
-        geojson_bounds_changed = true;
-        if (!geojson_visible) {
-          console.log("updateGeojsonLayer:not visible");
+      function updateTiledGeojsonLayer() {
+        console.log("updateTiledGeojsonLayer");
+        tiled_geojson_bounds_changed = true;
+        if (!tiled_geojson_visible) {
+          console.log("updateTiledGeojsonLayer:not visible");
           return;
         }
-        console.log('map.getZoom()', map.getZoom(),  'geojson_zoom', geojson_zoom);
+        console.log('map.getZoom()', map.getZoom(),  'tiled_geojson_zoom', tiled_geojson_zoom);
         if (map.getZoom() >= 13) {
-          showGeojsonLayer();
+          showTiledGeojsonLayer();
         } else {
           // if we zoom out too much do not show 
-          // geojson points
-          //hideGeojsonLayer();
-          geojson_visible = true;
+          // tiled_geojson points
+          //hideTiledGeojsonLayer();
+          tiled_geojson_visible = true;
         }
       }
 
@@ -643,21 +747,23 @@
       // Handle layer show/hide
 
       function showLayer(layer) {
-        console.log("showLayer:layer=", layer.name);
-          loadLayer(layer);
-          if (map) {
+          console.log("showLayer:layer=", layer.name);
+          var complete = loadLayer(layer);
+          if (map && complete) {
             if (layer.type == 'oldmaps') {
               for (var i = 0; i< layer.layer.length; i++) {
                 layer.layer[i].setMap(map);
               }            
             } else if (layer.type == 'kml') {
               layer.layer.setMap(map);
+            } else if (layer.type == 'activityjson') {
+              showActivityJSON(layer.layer);
             } else if (layer.type == 'kmlarray') {
               for (var i = 0; i < layer.layer.length; i++) {
                 layer.layer[i].setMap(map);
               }
-            } else if (layer.type == 'geojson') {
-              showGeojsonLayer();
+            } else if (layer.type == 'tiled_geojson') {
+              showTiledGeojsonLayer();
             }
           }
       }
@@ -669,14 +775,16 @@
               for (var i = 0; i < layer.layer.length; i++) {
                 layer.layer[i].setMap(null);
               }            
+            } else if (layer.type == 'activityjson') {
+              hideActivityJSON(layer.layer);
             } else if (layer.type == 'kml') {
               layer.layer.setMap(null);
             } else if (layer.type == 'kmlarray') {
               for (var i = 0; i < layer.layer.length; i++) {
                 layer.layer[i].setMap(null);
               }
-            } else if (layer.type == 'geojson') {
-              hideGeojsonLayer();
+            } else if (layer.type == 'tiled_geojson') {
+              hideTiledGeojsonLayer();
             }
           }
       }
@@ -784,7 +892,7 @@
         }
 
         map.addListener('bounds_changed', function() {
-          updateGeojsonLayer();
+          updateTiledGeojsonLayer();
         });
 
         // initMap: show markers listed in url
@@ -1030,6 +1138,11 @@
             'Espoon lähiretkiä layer data is from my own trips around Espoo, Finland.<br>' +
             '</p></p> ' +     
             'Parenteesipisteet data is from Parenteesikartat layer maps and other sources.<br>' +
+            '</p></p> ' +             
+            'Luolanimistö and Muut mielenkiintoiset nimet from <a href=https://nimisampo.fi/>Nimisampo</a>.<br>' +
+            '</p></p> ' +             
+            'Luolaseuran luolat data is from <a href=https://caving.fi/>Suomen luolaseura</a> and<br>' + 
+            'from book <a href=https://www.salakirjat.net/product/242/suomen-luolat>Suomen luolat</a>.<br>' +
             '</p></p> ' +             
             '</div>'+
             '</div>';
