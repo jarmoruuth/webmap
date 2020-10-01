@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>map 0.36</title>
+    <title>map 0.37</title>
     <link rel="icon" type="image/png" sizes="16x16" href="map-favicon.png">
     <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
     <meta charset="utf-8">
@@ -76,22 +76,27 @@
                         url : '', 
                         layer : null 
                       },
-                      { name : 'Luolanimistö', visible : false, type : 'kml', 
+                      { name : 'Luolaseuran luolat', visible : false, type : 'activityjson', 
+                        url : 'https://ruuth.xyz/caves_new.luolaseura.json', 
+                        layer : null 
+                      },
+                      { name : 'Nimet 1 (luola)', visible : false, type : 'kml', 
                         url : 'https://ruuth.xyz/Luolanimet.kml', 
                         layer : null 
                       },
-                      { name : 'Mielenkiintoiset nimet 1 (kirkko, kellari, kolo)', visible : false, type : 'kml', 
+                      { name : 'Nimet 2 (kirkko, kellari, kolo)', visible : false, type : 'kml', 
                         url : 'https://ruuth.xyz/kirkko_kellari_kolo.kml', 
                         layer : null 
                       },
-                      { name : 'Mielenkiintoiset nimet 2 (piru, hiiden, kasaberget)', visible : false, type : 'kml', 
+                      { name : 'Nimet 3 (piru, hiiden, kasaberget)', visible : false, type : 'kml', 
                         url : 'https://ruuth.xyz/piru_hiiden_kasaberget.kml', 
                         layer : null 
                       },
-                      { name : 'Luolaseuran luolat', visible : false, type : 'activityjson', 
-                        url : 'https://ruuth.xyz/caves.luolaseura.json', 
+                      { name : 'Lintutornit',  visible : false,  type : 'kml', 
+                        url : 'https://ruuth.xyz/Lintutornit_link.kmz', 
                         layer : null 
                       },
+
                    ];
       var maps = [
                       { name : 'peruskartta', altname : 'kapsi', visible : true
@@ -492,22 +497,22 @@
         .then(response => response.json())
         .then (json => {
           console.log('loadActivityJSON:process json');
-          js = json;
+          js = json.features;
           //console.log('loadActivityJSON:js', js);
           console.log('loadActivityJSON:js len', js.length);
           var markers = [];
           for (var i = 0; i < js.length; i++) {
             var infotxt = "<table>"+
-                          addRowActivityJSON("Nimi", js[i].n, false) +
-                          addRowActivityJSON("Pituus",  js[i].l, false) +
-                          addRowActivityJSON("Kirjaaja", js[i].rl[0].w, false) +
-                          addRowActivityJSON("Kartta", js[i].m, true) +
+                          addRowActivityJSON("Nimi", js[i].properties.n, false) +
+                          addRowActivityJSON("Pituus",  js[i].properties.l, false) +
+                          addRowActivityJSON("Kirjaaja", js[i].properties.rl[0].w, false) +
+                          addRowActivityJSON("Kartta", js[i].properties.m, true) +
                           "</table>"+
-                          "<br><a href="+js[i].rl[0].u+">Lisätietoja</a>";
+                          "<br><a href="+js[i].properties.rl[0].u+">Lisätietoja</a>";
             const marker = new google.maps.Marker({
-                                position: { lat: js[i].lat, lng: js[i].lon },
+                                position: { lat: js[i].geometry.coordinates[0], lng: js[i].geometry.coordinates[1] },
                                 map: map, 
-                                title: js[i].n,
+                                title: js[i].properties.n,
                                 info: infotxt
                             });
             marker.addListener("click", () => {
@@ -1143,7 +1148,9 @@
             '</p></p> ' +             
             'Luolaseuran luolat data is from <a href=https://caving.fi/>Suomen luolaseura</a> and<br>' + 
             'from book <a href=https://www.salakirjat.net/product/242/suomen-luolat>Suomen luolat</a>.<br>' +
-            '</p></p> ' +             
+            '</p></p> ' +
+            'Lintornit from Google My Maps <a href=https://www.google.com/maps/d/u/0/viewer?mid=1V0G10JDy6RxPXmN_eyyFb-5MT0E&ll=65.09362197686224%2C25.329884500000027&z=6>Suomen vesi-, näkö- ja lintutornit</a>'
+            '</p></p> ' +
             '</div>'+
             '</div>';
           infoPopup.close();
