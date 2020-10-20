@@ -513,7 +513,10 @@
                                 position: { lat: js[i].geometry.coordinates[0], lng: js[i].geometry.coordinates[1] },
                                 map: map, 
                                 title: js[i].properties.n,
-                                info: infotxt
+                                info: infotxt,
+                                icon: {                             
+                                  url: "http://maps.google.com/mapfiles/ms/icons/blue-dot.png"
+                                }
                             });
             marker.addListener("click", () => {
               infoWindow.setContent(marker.info);
@@ -864,19 +867,13 @@
         });
 
         // Geojson marker style
-        /* Default style is kind of good...
         map.data.setStyle(function(feature) {
           return({
             icon: {
-              path: google.maps.SymbolPath.CIRCLE,
-              scale: 4,
-              fillColor: '#f00',
-              fillOpacity: 0.5,
-              strokeWeight: 1
+              url: "http://maps.google.com/mapfiles/ms/icons/green-dot.png"
             }
           });
         });
-        */
 
         nbasemaps = map.mapTypeControlOptions.mapTypeIds.length;
         setVisibleMaps();
@@ -908,7 +905,10 @@
             position: url_markers[i].pos,
             map: map,
             title: 'Url marker',
-            label: url_markers[i].label
+            label: url_markers[i].label,
+            icon: {
+              url: "http://maps.google.com/mapfiles/ms/icons/yellow-dot.png"
+            }
           });
         }
 
