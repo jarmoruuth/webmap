@@ -96,7 +96,10 @@
                         url : 'https://ruuth.xyz/Lintutornit.kmz', 
                         layer : null 
                       },
-
+                      { name : 'Lintujen ruokintapaikkoja',  visible : false,  type : 'kml', 
+                        url : 'https://ruuth.xyz/Lintujen_ruokintapaikkoja.kmz', 
+                        layer : null 
+                      }
                    ];
       var maps = [
                       { name : 'peruskartta', altname : 'kapsi', visible : true
@@ -1184,7 +1187,7 @@
                 return url;
             } else {
               var url =  "http://avoin-karttakuva.maanmittauslaitos.fi/avoin/wmts/1.0.0/maastokartta/default/WGS84_Pseudo-Mercator/" + zoom + "/" + 
-                  coord.y + "/" + coord.x + ".png";
+                  coord.y + "/" + coord.x + ".png?api-key=API_KEY";
                 //console.log('Peruskartta url='+url);
                 return url;
             }
