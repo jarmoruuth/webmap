@@ -1281,7 +1281,7 @@
           var map_center = map.getCenter();
           // convert map coordinates to ETRS-GK25 (EPSG:3879) that is used for aerial photos
           var coord = proj4('ETRS-GK25', [map_center.lng(), map_center.lat()]);
-          var link = "https://kirkkonummi.karttatiimi.fi/?setlanguage=fi&e="+coord[0]+"&n="+coord[1]+"&r=1&w=&l=1956ortoilmakuva&o=100"+
+          var link = "https://kirkkonummi.karttatiimi.fi/?setlanguage=fi&e="+coord[0]+"&n="+coord[1]+"&r=1&w=&l=orto1954&o=100"+
                      "&geom=POINT("+coord[0]+"%20"+coord[1]+")";
           console.log("click 1956: jump to page " + link);
           //alert('jump to 1956');
