@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>map 0.37</title>
+    <title>map 0.38</title>
     <link rel="icon" type="image/png" sizes="16x16" href="map-favicon.png">
     <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
     <meta charset="utf-8">
@@ -1280,9 +1280,14 @@
           saveState();          
           var map_center = map.getCenter();
           // convert map coordinates to ETRS-GK25 (EPSG:3879) that is used for aerial photos
+          /*
           var coord = proj4('ETRS-GK25', [map_center.lng(), map_center.lat()]);
           var link = "https://kirkkonummi.karttatiimi.fi/?setlanguage=fi&e="+coord[0]+"&n="+coord[1]+"&r=1&w=&l=orto1954&o=100"+
                      "&geom=POINT("+coord[0]+"%20"+coord[1]+")";
+          */
+          var coord = proj4('ETRS-TM35FIN', [map_center.lng(), map_center.lat()]);
+          var link = "https://kartta.paikkatietoikkuna.fi/?zoomLevel=10&coord="+coord[0]+"_"+coord[1]+"&mapLayers=801+100+default,3400+100+"+
+                 "ortokuva:indeksi&markers=2|1|ffde00|"+coord[0]+"_"+coord[1]+"|&timeseries=1956&noSavedState=true&showIntro=false&lang=fi";
           console.log("click 1956: jump to page " + link);
           //alert('jump to 1956');
           window.location.href = link;
