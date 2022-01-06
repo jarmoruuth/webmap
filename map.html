@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>map 0.38</title>
+    <title>map 0.39</title>
     <link rel="icon" type="image/png" sizes="16x16" href="map-favicon.png">
     <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
     <meta charset="utf-8">
@@ -957,6 +957,9 @@
         settingsDiv = document.createElement("div");
         //document.body.appendChild(settingsDiv);
 
+        settingsDiv.appendChild(document.createTextNode('Version 0.39'));
+        settingsDiv.appendChild(document.createElement("BR"));
+        settingsDiv.appendChild(document.createElement("BR"));
         settingsDiv.appendChild(document.createTextNode('Center coordinates:'));
         settingsDiv.appendChild(document.createElement("BR"));
         coordinatesBox = document.createElement("INPUT");
@@ -1567,7 +1570,7 @@
 
     </script>
     <script async defer
-    src="https://maps.googleapis.com/maps/api/js?key=API_KEY&callback=initMap">
+    src="https://maps.googleapis.com/maps/api/js?key=XXX API_KEY XXX&callback=initMap">
     </script>
   </body>
 </html>
