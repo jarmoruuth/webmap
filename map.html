@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>map 0.39</title>
+    <title>map 0.40</title>
     <link rel="icon" type="image/png" sizes="16x16" href="map-favicon.png">
     <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
     <meta charset="utf-8">
@@ -744,7 +744,7 @@
           return;
         }
         console.log('map.getZoom()', map.getZoom(),  'tiled_geojson_zoom', tiled_geojson_zoom);
-        if (map.getZoom() >= 13) {
+        if (map.getZoom() >= 10) {
           showTiledGeojsonLayer();
         } else {
           // if we zoom out too much do not show 
