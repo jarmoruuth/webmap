@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>map 0.41</title>
+    <title>map 0.42</title>
     <link rel="icon" type="image/png" sizes="16x16" href="map-favicon.png">
     <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
     <meta charset="utf-8">
@@ -958,7 +958,7 @@
         settingsDiv = document.createElement("div");
         //document.body.appendChild(settingsDiv);
 
-        settingsDiv.appendChild(document.createTextNode('Version 0.41'));
+        settingsDiv.appendChild(document.createTextNode('Version 0.42'));
         settingsDiv.appendChild(document.createElement("BR"));
         settingsDiv.appendChild(document.createElement("BR"));
         settingsDiv.appendChild(document.createTextNode('Center coordinates:'));
@@ -1484,7 +1484,7 @@
           infoPopup.close();
           infoWindow.close();
           infoWindow.setPosition(pos);
-          var content = 'View on Google Maps: <a href=https://www.google.com/maps/place/'+current_location.lat+','+current_location.lng+' target=_blank>' + current_location.lat + ',' + current_location.lng +'</a>' +
+          var content = 'View on Google Maps: <a href=https://www.google.com/maps/place/'+pos.lat+','+pos.lng+' target=_blank>' + pos.lat + ',' + pos.lng +'</a>' +
                         '<img src="https://ruuth.xyz/ic_open_in_new.svg" style="height:20px">';
           console.log(content);
           infoWindow.setContent(content);
