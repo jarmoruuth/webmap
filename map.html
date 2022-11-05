@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>map 0.42</title>
+    <title>map 0.43</title>
     <link rel="icon" type="image/png" sizes="16x16" href="map-favicon.png">
     <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
     <meta charset="utf-8">
@@ -46,6 +46,7 @@
       var layerDialogDiv;
       var settingsDiv;
       var coordinatesBox;
+      var mapLinkBox;
       var kmlVersion = 6;
       var mapInfoTextDiv;
       var use_kapsi_maastokartat = false;
@@ -962,16 +963,25 @@
         settingsDiv = document.createElement("div");
         //document.body.appendChild(settingsDiv);
 
-        settingsDiv.appendChild(document.createTextNode('Version 0.42'));
+        settingsDiv.appendChild(document.createTextNode('Version 0.43'));
         settingsDiv.appendChild(document.createElement("BR"));
+
         settingsDiv.appendChild(document.createElement("BR"));
         settingsDiv.appendChild(document.createTextNode('Center coordinates:'));
         settingsDiv.appendChild(document.createElement("BR"));
         coordinatesBox = document.createElement("INPUT");
         coordinatesBox.setAttribute("type", "text");
         settingsDiv.appendChild(coordinatesBox);
-        //settingsDiv.appendChild(document.createTextNode(String(map_center.lat())+','+String(map_center.lng())));
         settingsDiv.appendChild(document.createElement("BR"));
+
+        settingsDiv.appendChild(document.createTextNode('Map link to center coordinates:'));
+        settingsDiv.appendChild(document.createElement("BR"));
+        mapLinkBox = document.createElement("INPUT");
+        mapLinkBox.setAttribute("type", "text");
+        settingsDiv.appendChild(mapLinkBox);
+        settingsDiv.appendChild(document.createElement("BR"));
+
+        //settingsDiv.appendChild(document.createTextNode(String(map_center.lat())+','+String(map_center.lng())));
         settingsDiv.appendChild(document.createElement("BR"));
         // Create check box for all maps
         //settingsDiv.appendChild(document.createTextNode('Maps:'));
@@ -1394,9 +1404,15 @@
         settingsButton.src = 'https://ruuth.xyz/ic_settings_black_24px.svg';
         settingsButton.addEventListener('click', function() {
           console.log("click Settings");
+
           var map_center = map.getCenter();
+          
           coordinatesBox.value = String(map_center.lat())+','+String(map_center.lng());
           coordinatesBox.defaultValue = coordinatesBox.value;
+          
+          mapLinkBox.value = "https://ruuth.xyz/map.html?center=" + String(map_center.lat())+','+String(map_center.lng());
+          mapLinkBox.defaultValue = coordinatesBox.value;
+          
           infoPopup.close();
           infoWindow.close();
           infoWindow.setContent(settingsDiv);
