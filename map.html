@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>map 0.43</title>
+    <title>Map</title>
     <link rel="icon" type="image/png" sizes="16x16" href="map-favicon.png">
     <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
     <meta charset="utf-8">
@@ -27,14 +27,17 @@
       // prompted by your browser. If you see the error "The Geolocation service
       // failed.", it means you probably did not give permission for the browser to
       // locate you.
+
+      var version = "0.44";
+
       var map;
       var id, infoWindow, infoPopup, marker, options;
       var nbasemaps;
       var current_location = {lat: 60.2053791, lng: 24.6540694};          // Espoo
       var autoMove = true;
       var path = [];                // path of last positions
-      var maxpath = 10;             // max path points to save
-      var pathinterval = 10000;     // interval for storing path points
+      var maxpath = 180;            // max path points to save, three hours with once a minute save interval
+      var pathinterval = 60000;     // interval for storing path points, every minute, should be ok for walking
       var recording_distance = 10;  // distance between points before we record a new one
       var circle_radius = 5;
       var centerMarker;
@@ -51,6 +54,7 @@
       var mapInfoTextDiv;
       var use_kapsi_maastokartat = false;
       var use_kapsi_ortokuvat = true;
+      var opentopomap_site = 'a';
       var layers = [
                       { name : 'Lynx parenteesi',  visible : false,  type : 'kml', 
                         url : 'https://ruuth.xyz/Lynx.kmz', 
@@ -111,6 +115,8 @@
                       { name : 'peruskartta', altname : 'kapsi', visible : true
                       },
                       { name : 'ortokuvat', altname : 'kapsi', visible : true
+                      },                      
+                      { name : 'opentopomap', altname : 'opentopomap', visible : true
                       },                      
                       { name : 'mapant', altname : 'MapAnt', visible : false
                       }
@@ -963,7 +969,7 @@
         settingsDiv = document.createElement("div");
         //document.body.appendChild(settingsDiv);
 
-        settingsDiv.appendChild(document.createTextNode('Version 0.43'));
+        settingsDiv.appendChild(document.createTextNode('Version ' + version));
         settingsDiv.appendChild(document.createElement("BR"));
 
         settingsDiv.appendChild(document.createElement("BR"));
@@ -1060,6 +1066,71 @@
         settingsDiv.appendChild(checkBox);
         settingsDiv.appendChild(document.createTextNode('Ortokuvat from Kapsi'));
         settingsDiv.appendChild(document.createElement("BR")); 
+        settingsDiv.appendChild(document.createElement("BR")); 
+
+        // Select visible maps
+        settingsDiv.appendChild(document.createTextNode('Visible maps'));
+        settingsDiv.appendChild(document.createElement("BR"));
+
+        for (var i = 0; i < maps.length; i++) {
+          checkBox = document.createElement("INPUT");
+          checkBox.setAttribute("type", "checkbox");
+          checkBox.value = maps[i].name;
+          checkBox.checked = maps[i].visible;
+          checkBox.onclick = function() {
+            console.log("settingsDialog clicked, map=" + this.value + ",checked=", this.checked);
+            for (var i = 0; i < maps.length; i++) {
+              if (maps[i].name == this.value) {
+                maps[i].visible = this.checked;
+              }
+            }
+          };
+          settingsDiv.appendChild(checkBox);
+          settingsDiv.appendChild(document.createTextNode(maps[i].name));
+          settingsDiv.appendChild(document.createElement("BR"));            
+        }
+
+        // Select opentopomap a, b or c site
+        settingsDiv.appendChild(document.createElement("BR"));
+        settingsDiv.appendChild(document.createTextNode('OpenTopoMap'));
+        settingsDiv.appendChild(document.createElement("BR"));
+        var opentopomap_a = document.createElement("INPUT");
+        opentopomap_a.setAttribute("type", "radio");
+        opentopomap_a.setAttribute("name", "opentopomap");
+        opentopomap_a.value = 'a';
+        opentopomap_a.checked = opentopomap_site == 'a';
+        opentopomap_a.onclick = function() {
+          opentopomap_site = 'a';
+          console.log("settingsDiv clicked, name=" + this.value + ",checked=", this.checked);
+        };
+        settingsDiv.appendChild(opentopomap_a);
+        settingsDiv.appendChild(document.createTextNode('a'));
+        settingsDiv.appendChild(document.createElement("BR"));
+        var opentopomap_b = document.createElement("INPUT");
+        opentopomap_b.setAttribute("type", "radio");
+        opentopomap_b.setAttribute("name", "opentopomap");
+        opentopomap_b.value = 'b';
+        opentopomap_b.checked = opentopomap_site == 'b';
+        opentopomap_b.onclick = function() {
+          opentopomap_site = 'b';
+          console.log("settingsDiv clicked, name=" + this.value + ",checked=", this.checked);
+        };
+        settingsDiv.appendChild(opentopomap_b);
+        settingsDiv.appendChild(document.createTextNode('b'));
+        settingsDiv.appendChild(document.createElement("BR"));
+        var opentopomap_c = document.createElement("INPUT");
+        opentopomap_c.setAttribute("type", "radio");
+        opentopomap_c.setAttribute("name", "opentopomap");
+        opentopomap_c.value = 'c';
+        opentopomap_c.checked = opentopomap_site == 'c';
+        opentopomap_c.onclick = function() {
+          opentopomap_site = 'c';
+          console.log("settingsDiv clicked, name=" + this.value + ",checked=", this.checked);
+        };
+        settingsDiv.appendChild(opentopomap_c);
+        settingsDiv.appendChild(document.createTextNode('c'));
+        settingsDiv.appendChild(document.createElement("BR"));
+        settingsDiv.appendChild(document.createElement("BR"));
 
         // extra line break
         settingsDiv.appendChild(document.createElement("BR"));
@@ -1126,7 +1197,7 @@
             'maps=name[,name...]<br>' + 
             '</p> ' +
             '<p>Url can have multiple kml and marker parameters.<br>' +
-            'Possible maps are peruskartta, ortokuvat and mapant.'
+            'Possible maps are peruskartta, ortokuvat, opentopomap and mapant.'
             '</p>' +
             '</div>'+
             '</div>';
@@ -1161,6 +1232,8 @@
             '</p><p>' +            
             'MapAnt maps created and hosted by:<br>' +                       
             '<a href=http://www.mapant.fi/>http://www.mapant.fi/</a>' +
+            '</p><p>' +            
+            'OpenTopoMap data: © OpenStreetMap contributors, SRTM | map style: © OpenTopoMap (CC-BY-SA)' +
             '</p><p>' +            
             'Maps for Parenteesikartat layer are from book:<br>' + 
             'Pekka Silvast, 1991. Porkkala 1944–1956 - Neuvostoliiton merisotilaallinen tukikohta. Tutkimusraportti, Sotamuseo 1/1991.' +
@@ -1255,6 +1328,23 @@
         });
 
         map.mapTypes.set('ortokuvat', ortoMapType);
+
+        // ------------------------------------------------------------
+        // initMap: Open Topo Map 
+
+        var opentopoMapType = new google.maps.ImageMapType({
+          getTileUrl: function(coord, zoom) {
+              var url= "https://" + opentopomap_site + ".tile.opentopomap.org/" + zoom + "/" + coord.x + "/" + coord.y + ".png";
+              //console.log('OpenTopoMap url='+url);
+              return url;
+          },
+          tileSize: new google.maps.Size(256, 256),
+          maxZoom: 17,
+          minZoom: 0,
+          name: 'OpenTopoMap'
+        });
+
+        map.mapTypes.set('opentopomap', opentopoMapType);
 
         // ------------------------------------------------------------
         // initMap: MapAnt 
@@ -1461,6 +1551,9 @@
             showStreetViewControl = false;
           } else if (map.getMapTypeId() == 'mapant') {
             mapInfoTextDiv.innerHTML = 'Maanmittauslaitos, MapAnt';
+            showStreetViewControl = false;
+          } else if (map.getMapTypeId() == 'opentopomap') {
+            mapInfoTextDiv.innerHTML = 'OpenStreetMap, OpenTopoMap';
             showStreetViewControl = false;
           } else {
             mapInfoTextDiv.innerHTML = '';
