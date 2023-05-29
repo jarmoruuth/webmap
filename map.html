@@ -537,7 +537,7 @@
                                 title: js[i].properties.n,
                                 info: infotxt,
                                 icon: {                             
-                                  url: "http://maps.google.com/mapfiles/ms/icons/blue-dot.png"
+                                  url: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png"
                                 }
                             });
             marker.addListener("click", () => {
@@ -892,7 +892,7 @@
         map.data.setStyle(function(feature) {
           return({
             icon: {
-              url: "http://maps.google.com/mapfiles/ms/icons/green-dot.png"
+              url: "https://maps.google.com/mapfiles/ms/icons/green-dot.png"
             }
           });
         });
@@ -938,7 +938,7 @@
             title: 'Url marker',
             label: url_markers[i].label,
             icon: {
-              url: "http://maps.google.com/mapfiles/ms/icons/yellow-dot.png"
+              url: "https://maps.google.com/mapfiles/ms/icons/yellow-dot.png"
             }
           });
         }
@@ -1235,13 +1235,13 @@
             'Roadmap and satellite images from Google.' +
             '</p><p>' +
             'Topography maps and aerial images from Maanmittauslaitos:<br>' +
-            '<a href=http://www.maanmittauslaitos.fi/>http://www.maanmittauslaitos.fi/</a>' +
+            '<a href=https://www.maanmittauslaitos.fi/>https://www.maanmittauslaitos.fi/</a>' +
             '</p><p>' +            
             'Ortoilmakuvat and optionally Maastokartat hosted by:<br>' +            
             '<a href=https://www.kapsi.fi/>https://www.kapsi.fi/</a>' +
             '</p><p>' +            
             'MapAnt maps created and hosted by:<br>' +                       
-            '<a href=http://www.mapant.fi/>http://www.mapant.fi/</a>' +
+            '<a href=https://www.mapant.fi/>https://www.mapant.fi/</a>' +
             '</p><p>' +            
             'OpenTopoMap data: © OpenStreetMap contributors, SRTM | map style: © OpenTopoMap (CC-BY-SA)' +
             '</p><p>' +            
@@ -1249,13 +1249,13 @@
             'Pekka Silvast, 1991. Porkkala 1944–1956 - Neuvostoliiton merisotilaallinen tukikohta. Tutkimusraportti, Sotamuseo 1/1991.' +
             '</p></p> ' +
             'Lynx layer data created by Kirkkonummi Orienteering Club Lynx:<br>' +
-            '<a href=http://www.lynx.fi/index.php/parenteesi-suunnistuskartalle>Parenteesi suunnistuskartalle</a>' +
+            '<a href=https://www.lynx.fi/index.php/parenteesi-suunnistuskartalle>Parenteesi suunnistuskartalle</a>' +
             '</p><p>' +
             'Muinaisjäännökset and Maailmaperintökohteet data from Museovirasto:<br>' +
-            '<a href=http://www.museovirasto.fi>Museovirasto</a>' +
+            '<a href=https://www.museovirasto.fi>Museovirasto</a>' +
             '</p></p> ' +            
             'Planetskier layer data from:<br>' +
-            '<a href=http://planetskier.blogspot.fi/>Planetskier</a>' +
+            '<a href=https://planetskier.blogspot.fi/>Planetskier</a>' +
             '</p></p> ' +          
             'Espoon lähiretkiä layer data is from my own trips around Espoo, Finland.<br>' +
             '</p></p> ' +     
@@ -1296,11 +1296,11 @@
         var perusMapType = new google.maps.ImageMapType({
           getTileUrl: function(coord, zoom) {
             if (use_kapsi_maastokartat) {
-                var url =  "http://tiles.kartat.kapsi.fi/peruskartta/" + zoom + "/" + 
+                var url =  "https://tiles.kartat.kapsi.fi/peruskartta/" + zoom + "/" + 
                   coord.x + "/" + coord.y + ".jpg";
                 return url;
             } else {
-              var url =  "http://avoin-karttakuva.maanmittauslaitos.fi/avoin/wmts/1.0.0/maastokartta/default/WGS84_Pseudo-Mercator/" + zoom + "/" + 
+              var url =  "https://avoin-karttakuva.maanmittauslaitos.fi/avoin/wmts/1.0.0/maastokartta/default/WGS84_Pseudo-Mercator/" + zoom + "/" + 
                   coord.y + "/" + coord.x + ".png?api-key=API_KEY";
                 //console.log('Peruskartta url='+url);
                 return url;
@@ -1320,12 +1320,12 @@
         var ortoMapType = new google.maps.ImageMapType({
           getTileUrl: function(coord, zoom) {
             if (use_kapsi_ortokuvat) {
-                var url = "http://tiles.kartat.kapsi.fi/ortokuva/" + zoom + "/" + 
+                var url = "https://tiles.kartat.kapsi.fi/ortokuva/" + zoom + "/" + 
                   coord.x + "/" + coord.y + ".png";
                 //console.log('Ortokuvat url='+url);
                 return url;
             } else {
-              var url =  "http://avoin-karttakuva.maanmittauslaitos.fi/avoin/wmts/1.0.0/ortokuva/default/WGS84_Pseudo-Mercator/" + zoom + "/" + 
+              var url =  "https://avoin-karttakuva.maanmittauslaitos.fi/avoin/wmts/1.0.0/ortokuva/default/WGS84_Pseudo-Mercator/" + zoom + "/" + 
                   coord.y + "/" + coord.x + ".png?api-key=API_KEY";
                 //console.log('Ortokuvat url='+url);
                 return url;
@@ -1361,7 +1361,7 @@
 
         var mapantMapType = new google.maps.ImageMapType({
           getTileUrl: function(coord, zoom) {
-              var url = 'http://wmts.mapant.fi/wmts_EPSG3857.php?z='+zoom+'&x='+coord.x+'&y='+coord.y;
+              var url = 'https://wmts.mapant.fi/wmts_EPSG3857.php?z='+zoom+'&x='+coord.x+'&y='+coord.y;
               //console.log('MapAnt url='+url);
               return url;
           },
