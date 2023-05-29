@@ -28,7 +28,7 @@
       // failed.", it means you probably did not give permission for the browser to
       // locate you.
 
-      var version = "0.45 test1";
+      var version = "0.45 test2";
 
       var map;
       var id, infoWindow, infoPopup, marker, options;
@@ -56,6 +56,7 @@
       var use_kapsi_maastokartat = false;
       var use_kapsi_ortokuvat = true;
       var opentopomap_site = 'a';
+      var measureDistanceMode = 0;
       var measureDistancePath = null;
       var measureDistanceLastPos = null;
       var measureDistanceLength = 0;
@@ -919,8 +920,9 @@
           var northEast = bounds.getNorthEast();
           var southWest = bounds.getSouthWest();
           infoBottomWindowPos = new google.maps.LatLng(southWest.lat(), southWest.lng()+(northEast.lng()-southWest.lng())/2);
-          if (measureDistancePath != null) {
+          if (measureDistanceMode != 0) {
               infoBottomWindow.setPosition(infoBottomWindowPos);
+              infoBottomWindow.open(map);
           }
           
           updateTiledGeojsonLayer();
@@ -999,31 +1001,25 @@
         mapLinkBox = document.createElement("INPUT");
         mapLinkBox.setAttribute("type", "text");
         settingsDiv.appendChild(mapLinkBox);
+
+        settingsDiv.appendChild(document.createElement("BR"));
         settingsDiv.appendChild(document.createElement("BR"));
 
-        //settingsDiv.appendChild(document.createTextNode(String(map_center.lat())+','+String(map_center.lng())));
+        // Create clikable link to start distance measure mode
+        var measureDistanceButton = document.createElement("BUTTON");
+        measureDistanceButton.appendChild(document.createTextNode("Measure distance"));
+        measureDistanceButton.onclick = function(){
+            console.log("measureDistanceButton clicked");
+            if (measureDistancePath == null) {
+                startMeasureDistanceFromButton();
+            } else {
+                console.log("measureDistanceButton clicked, already measuring distance");
+            }
+        };
+        settingsDiv.appendChild(measureDistanceButton);
+
         settingsDiv.appendChild(document.createElement("BR"));
-        // Create check box for all maps
-        //settingsDiv.appendChild(document.createTextNode('Maps:'));
-        //settingsDiv.appendChild(document.createElement("BR"));        
-        //for (var i = 0; i < maps.length; i++) {
-        //  checkBox = document.createElement("INPUT");
-        //  checkBox.setAttribute("type", "checkbox");
-          // checkBox.value = maps[i].name;
-          // checkBox.checked = maps[i].visible;
-          // checkBox.onclick = function() {
-            // console.log("settingsDialog clicked, map=" + this.value + ",checked=", this.checked);
-            // for (var i = 0; i < maps.length; i++) {
-              // if (maps[i].name == this.value) {
-                // maps[i].visible = this.checked;
-              // }
-            // }
-          // };
-          // settingsDiv.appendChild(checkBox);
-          // settingsDiv.appendChild(document.createTextNode(maps[i].name));
-          // settingsDiv.appendChild(document.createElement("BR"));            
-        // }        
-        // settingsDiv.appendChild(document.createElement("BR"));          
+        settingsDiv.appendChild(document.createElement("BR"));
 
         // Create check box for KML refresh
         checkBox = document.createElement("INPUT");
@@ -1607,28 +1603,48 @@
         });
 
         // initMap: Event listener for right click
-        google.maps.event.addListener(map, "rightclick", function(event) {
+        google.maps.event.addListener(map, 'rightclick', function(event) {
           var pos = event.latLng;
           lastRightClickPos = pos;
           infoPopup.close();
           infoWindow.close();
           infoWindow.setPosition(pos);
-          if (measureDistancePath != null) {
+          if (measureDistanceMode != 0) {
             // We are in measure distance mode.
-            addLineToMeasureDistancePath(measureDistanceLastPos, pos);
-            measureDistanceLength += calcDistance(measureDistanceLastPos, pos);
-            measureDistanceLastPos = pos;
-            showMeasureDistance();
+            measureDistanceEvent(pos);
           } else {
             var content = '<p>View on Google Maps: <a href=https://www.google.com/maps/place/'+pos.lat+','+pos.lng+' target=_blank>' + pos.lat + ',' + pos.lng +'</a>' +
                           '<img src="https://ruuth.xyz/ic_open_in_new.svg" style="height:20px"></p>';
             // add clickable option to infobox to measure distance
-            content += '<p><a href="javascript:measureDistance()" style="color:blue">Measure distance</a></p>';
+            content += '<p><a href="javascript:startMeasureDistance()" style="color:blue">Measure distance</a></p>';
             console.log(content);
             infoWindow.setContent(content);
             infoWindow.open(map);
           }
-      });
+        });
+
+        google.maps.event.addListener(map, 'click', function(event) {
+          if (measureDistanceMode != 0) {
+            // We are in measure distance mode.
+            console.log("click");
+            var pos = event.latLng;
+            measureDistanceEvent(pos);
+          }
+        });
+
+        google.maps.event.addListener(map, 'touchend', function(event) {
+          if (measureDistanceMode != 0) {
+            // We are in measure distance mode.
+            console.log("touchend");
+            var touch = event.changedTouches[0];
+            var point = new google.maps.Point(touch.clientX, touch.clientY);
+            var pos = overlay.getProjection().fromContainerPixelToLatLng(point);
+            console.log("touchend: " + pos);
+            measureDistanceEvent(pos);
+          }
+        });
+
+
         // ------------------------------------------------------------
         // Options for getting position
 
@@ -1664,11 +1680,25 @@
         var line = new google.maps.Polyline({
           path: [p1, p2],
           strokeColor: "#FF0000",
-          strokeOpacity: 1.0,
-          strokeWeight: 2,
+          strokeWeight: 4,
           map: map
         });
         measureDistancePath.push(line);
+        // Add circle at the end of the line
+        measureDistancePath.push(distancePathCircle(p2));
+      }
+
+      function measureDistanceEvent(pos) {
+          console.log("measureDistanceEvent");
+          if (measureDistanceMode == 1) {
+              measureDistanceMode = 2;
+              startMeasureDistanceFromPos(pos);
+          } else {
+              addLineToMeasureDistancePath(measureDistanceLastPos, pos);
+              measureDistanceLength += calcDistance(measureDistanceLastPos, pos);
+              measureDistanceLastPos = pos;
+              showMeasureDistance();
+          }
       }
 
       // Clear lines from the map
@@ -1679,11 +1709,28 @@
         measureDistancePath = [];
       }
 
-      function measureDistance()
+      function startMeasureDistanceFromPos(pos)
       {
-          console.log("measureDistance");
+          console.log("startMeasureDistanceFromPos");
           measureDistancePath = [];
-          measureDistanceLastPos = lastRightClickPos;
+          measureDistanceLastPos = pos;
+          showMeasureDistance();
+      }
+
+      // Start from right click menu, we already have a starting position
+      function startMeasureDistance()
+      {
+          console.log("startMeasureDistance");
+          measureDistanceMode = 2;
+          startMeasureDistanceFromPos(lastRightClickPos);
+      }
+
+      // Start from tools menu button, get the starting position
+      function startMeasureDistanceFromButton()
+      {
+          console.log("startMeasureDistanceFromButton");
+          measureDistanceMode = 1;
+          measureDistancePath = [];
           showMeasureDistance();
       }
 
@@ -1694,24 +1741,27 @@
           infoBottomWindow.close();
           measureDistancePath = null;
           measureDistanceLength = 0;
+          measureDistanceMode = 0;
       }
 
       function showMeasureDistance()
       {
-          if (measureDistanceLength == 0) {
+          if (measureDistanceMode == 1) {
               infoWindow.close();
-              measureDistancePath.push(pathCircle(measureDistanceLastPos));
-              var content = "<p>Right click on the map to add points to the path</p>";
+              var content = "<p>Click or tap the map to set the starting point</p>";
+          } else if (measureDistanceLength == 0) {
+              infoWindow.close();
+              measureDistancePath.push(distancePathCircle(measureDistanceLastPos));
+              var content = "<p>Click or tap on the map to add points to the path</p>";
+          } else if (measureDistanceLength >= 10000) {
+              var content = "<p>Distance: " + (measureDistanceLength/1000).toFixed(2) + " km</p>";
           } else {
               var content = "<p>Distance: " + measureDistanceLength.toFixed(2) + " m</p>";
           }
           content += '<p><a href="javascript:stopMeasureDistance()" style="color:blue">Stop measuring</a></p>';
-          console.log("showMeasureDistance", content);
+
           infoBottomWindow.setContent(content);
-
           infoBottomWindow.setPosition(infoBottomWindowPos);
-          // infoBottomWindow.setPosition(map.getCenter());
-
           infoBottomWindow.open(map);
       }
 
@@ -1776,7 +1826,6 @@
 
       // ------------------------------------------------------------
       // Function to create a circle for the path
-
       function pathCircle(loc) {
         var new_circle = new google.maps.Circle({
                                   strokeColor: '#FF0000',
@@ -1791,6 +1840,20 @@
                                 });
           return(new_circle);
       }
+
+      function distancePathCircle(loc) {
+        var new_circle = new google.maps.Circle({
+                                  strokeColor: '#000000',
+                                  strokeWeight: 3,
+                                  fillColor: '#FFFFFF',
+                                  map: map,
+                                  center: loc,
+                                  radius: circle_radius,
+                                  clickable : false
+                                });
+          return(new_circle);
+      }
+
 
       // ------------------------------------------------------------
       // function to be called periodically to show path
