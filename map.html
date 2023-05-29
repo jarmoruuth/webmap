@@ -28,10 +28,11 @@
       // failed.", it means you probably did not give permission for the browser to
       // locate you.
 
-      var version = "0.44";
+      var version = "0.45 test1";
 
       var map;
       var id, infoWindow, infoPopup, marker, options;
+      var infoBottomWindow, infoBottomWindowPos;
       var nbasemaps;
       var current_location = {lat: 60.2053791, lng: 24.6540694};          // Espoo
       var autoMove = true;
@@ -55,6 +56,11 @@
       var use_kapsi_maastokartat = false;
       var use_kapsi_ortokuvat = true;
       var opentopomap_site = 'a';
+      var measureDistancePath = null;
+      var measureDistanceLastPos = null;
+      var measureDistanceLength = 0;
+      var lastRightClickPos = null;
+
       var layers = [
                       { name : 'Lynx parenteesi',  visible : false,  type : 'kml', 
                         url : 'https://ruuth.xyz/Lynx.kmz', 
@@ -909,6 +915,14 @@
         }
 
         map.addListener('bounds_changed', function() {
+          var bounds = map.getBounds();
+          var northEast = bounds.getNorthEast();
+          var southWest = bounds.getSouthWest();
+          infoBottomWindowPos = new google.maps.LatLng(southWest.lat(), southWest.lng()+(northEast.lng()-southWest.lng())/2);
+          if (measureDistancePath != null) {
+              infoBottomWindow.setPosition(infoBottomWindowPos);
+          }
+          
           updateTiledGeojsonLayer();
         });
 
@@ -1369,6 +1383,10 @@
         marker = null;
         infoWindow = new google.maps.InfoWindow;
         infoPopup = new google.maps.InfoWindow;
+        infoBottomWindow = new google.maps.InfoWindow({
+                                disableAutoPan: true,
+                                pixelOffset: new google.maps.Size(0, -50) // Set the y-axis offset to -50 pixels
+                            });
 
         function setDivStyle(div) {
           div.style.backgroundColor = '#fff';
@@ -1590,18 +1608,26 @@
 
         // initMap: Event listener for right click
         google.maps.event.addListener(map, "rightclick", function(event) {
-          var pos = {
-                lat: event.latLng.lat(),
-                lng: event.latLng.lng()
-          };
+          var pos = event.latLng;
+          lastRightClickPos = pos;
           infoPopup.close();
           infoWindow.close();
           infoWindow.setPosition(pos);
-          var content = 'View on Google Maps: <a href=https://www.google.com/maps/place/'+pos.lat+','+pos.lng+' target=_blank>' + pos.lat + ',' + pos.lng +'</a>' +
-                        '<img src="https://ruuth.xyz/ic_open_in_new.svg" style="height:20px">';
-          console.log(content);
-          infoWindow.setContent(content);
-          infoWindow.open(map);
+          if (measureDistancePath != null) {
+            // We are in measure distance mode.
+            addLineToMeasureDistancePath(measureDistanceLastPos, pos);
+            measureDistanceLength += calcDistance(measureDistanceLastPos, pos);
+            measureDistanceLastPos = pos;
+            showMeasureDistance();
+          } else {
+            var content = '<p>View on Google Maps: <a href=https://www.google.com/maps/place/'+pos.lat+','+pos.lng+' target=_blank>' + pos.lat + ',' + pos.lng +'</a>' +
+                          '<img src="https://ruuth.xyz/ic_open_in_new.svg" style="height:20px"></p>';
+            // add clickable option to infobox to measure distance
+            content += '<p><a href="javascript:measureDistance()" style="color:blue">Measure distance</a></p>';
+            console.log(content);
+            infoWindow.setContent(content);
+            infoWindow.open(map);
+          }
       });
         // ------------------------------------------------------------
         // Options for getting position
@@ -1627,6 +1653,67 @@
           handleLocationError(false, infoWindow, map.getCenter());
         }
       } // initMap: end
+
+      // Calculate distance between points that the user clicks on the map
+      function calcDistance(p1, p2) {
+        return google.maps.geometry.spherical.computeDistanceBetween(p1, p2);
+      }
+
+      // Add a line to the map between clicked points
+      function addLineToMeasureDistancePath(p1, p2) {
+        var line = new google.maps.Polyline({
+          path: [p1, p2],
+          strokeColor: "#FF0000",
+          strokeOpacity: 1.0,
+          strokeWeight: 2,
+          map: map
+        });
+        measureDistancePath.push(line);
+      }
+
+      // Clear lines from the map
+      function clearMeasureDistancePath() {
+        for (var i = 0; i < measureDistancePath.length; i++) {
+            measureDistancePath[i].setMap(null);
+        }
+        measureDistancePath = [];
+      }
+
+      function measureDistance()
+      {
+          console.log("measureDistance");
+          measureDistancePath = [];
+          measureDistanceLastPos = lastRightClickPos;
+          showMeasureDistance();
+      }
+
+      function stopMeasureDistance()
+      {
+          console.log("stopMeasureDistance");
+          clearMeasureDistancePath();
+          infoBottomWindow.close();
+          measureDistancePath = null;
+          measureDistanceLength = 0;
+      }
+
+      function showMeasureDistance()
+      {
+          if (measureDistanceLength == 0) {
+              infoWindow.close();
+              measureDistancePath.push(pathCircle(measureDistanceLastPos));
+              var content = "<p>Right click on the map to add points to the path</p>";
+          } else {
+              var content = "<p>Distance: " + measureDistanceLength.toFixed(2) + " m</p>";
+          }
+          content += '<p><a href="javascript:stopMeasureDistance()" style="color:blue">Stop measuring</a></p>';
+          console.log("showMeasureDistance", content);
+          infoBottomWindow.setContent(content);
+
+          infoBottomWindow.setPosition(infoBottomWindowPos);
+          // infoBottomWindow.setPosition(map.getCenter());
+
+          infoBottomWindow.open(map);
+      }
 
       // ------------------------------------------------------------
       // Update current position in the map
