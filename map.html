@@ -141,13 +141,13 @@
         ];
         var maps = [
             {
-                name: 'peruskartta', altnames: ['maasto', 'maastokartta'], visible: true
+                name: 'maasto', altnames: ['peruskartta', 'maasto', 'maastokartta'], visible: true
             },
             {
-                name: 'ortokuvat', altnames: ['ilma', 'ortoilmakuvat'], visible: true
+                name: 'ilma', altnames: ['ortokuvat', 'ilma', 'ortoilmakuvat'], visible: true
             },
             {
-                name: 'opentopomap', altnames: ['opentopo'], visible: false
+                name: 'opentopo', altnames: ['opentopomap', 'opentopo'], visible: false
             },
             {
                 name: 'mapant', altnames: ['MapAnt'], visible: false
@@ -977,7 +977,7 @@
                 var bounds = map.getBounds();
                 var northEast = bounds.getNorthEast();
                 var southWest = bounds.getSouthWest();
-                infoBottomWindowPos = new google.maps.LatLng(southWest.lat(), southWest.lng() + (northEast.lng() - southWest.lng()) / 2);
+                infoBottomWindowPos = new google.maps.LatLng(southWest.lat(), (southWest.lng() + northEast.lng()) / 2);
                 if (measureDistanceMode != 0) {
                     infoBottomWindow.setPosition(infoBottomWindowPos);
                     infoBottomWindow.open(map);
@@ -1355,7 +1355,7 @@
                 name: 'Maasto'
             });
 
-            map.mapTypes.set('peruskartta', perusMapType);
+            map.mapTypes.set('maasto', perusMapType);
 
             // ------------------------------------------------------------
             // initMap: Ortoilmakuvat
@@ -1380,7 +1380,7 @@
                 name: 'Ilma'
             });
 
-            map.mapTypes.set('ortokuvat', ortoMapType);
+            map.mapTypes.set('ilma', ortoMapType);
 
             // ------------------------------------------------------------
             // initMap: Open Topo Map 
@@ -1397,7 +1397,7 @@
                 name: 'OpenTopo'
             });
 
-            map.mapTypes.set('opentopomap', opentopoMapType);
+            map.mapTypes.set('opentopo', opentopoMapType);
 
             // ------------------------------------------------------------
             // initMap: MapAnt 
