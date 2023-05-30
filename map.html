@@ -119,13 +119,13 @@
                       }
                    ];
       var maps = [
-                      { name : 'peruskartta', altname : 'kapsi', visible : true
+                      { name : 'peruskartta', altnames : [ 'maasto', 'maastokartta' ], visible : true
                       },
-                      { name : 'ortokuvat', altname : 'kapsi', visible : true
+                      { name : 'ortokuvat', altnames : [ 'ilma', 'ortoilmakuvat' ], visible : true
                       },                      
-                      { name : 'opentopomap', altname : 'opentopomap', visible : true
+                      { name : 'opentopomap', altnames : [ 'opentopo' ], visible : false
                       },                      
-                      { name : 'mapant', altname : 'MapAnt', visible : false
+                      { name : 'mapant', altnames : [ 'MapAnt' ], visible : false
                       }
                 ];
       var overlayMaps = [
@@ -432,7 +432,18 @@
         }
         for (var i = 0; i < visible_maps.length; i++) {
             for (var j = 0; j < maps.length; j++) {
-              if (visible_maps[i] == maps[j].name || visible_maps[i] == maps[j].altname) {
+              let set_visible = false;
+              if (visible_maps[i] == maps[j].name) {
+                set_visible = true;
+              } else {
+                for (let k = 0; k < maps[j].altnames.length; k++) {
+                  if (visible_maps[i] == maps[j].altnames[k]) {
+                    set_visible = true;
+                    break;
+                  }
+                }
+              }
+              if (set_visible) {
                 console.log("set map " + maps[j].name + " visible");
                 maps[j].visible = true;
               }
@@ -1010,7 +1021,7 @@
         measureDistanceButton.appendChild(document.createTextNode("Measure distance"));
         measureDistanceButton.onclick = function(){
             console.log("measureDistanceButton clicked");
-            if (measureDistancePath == null) {
+            if (measureDistanceMode == 0) {
                 startMeasureDistanceFromButton();
             } else {
                 console.log("measureDistanceButton clicked, already measuring distance");
@@ -1145,19 +1156,6 @@
         // extra line break
         settingsDiv.appendChild(document.createElement("BR"));
         
-        var atttribution_kapsi = false;
-        var atttribution_mapant = false;
-        for (var i = 0; i < maps.length; i++) {
-          if (maps[i].visible) {
-            if (maps[i].altname == 'kapsi') {
-              atttribution_kapsi = true;
-            }
-            if (maps[i].name == 'mapant') {
-              atttribution_mapant = true;
-            }
-          }
-        }
-
         // Close button
         var settingsCloseButton = document.createElement("BUTTON");
         settingsCloseButton.appendChild(document.createTextNode("Close"));
@@ -1309,7 +1307,7 @@
           tileSize: new google.maps.Size(256, 256),
           maxZoom: 18,
           minZoom: 0,
-          name: 'Peruskartta'
+          name: 'Maasto'
         });
 
         map.mapTypes.set('peruskartta', perusMapType);
@@ -1334,7 +1332,7 @@
           tileSize: new google.maps.Size(256, 256),
           maxZoom: 19,
           minZoom: 0,
-          name: 'Ortoilmakuvat'
+          name: 'Ilma'
         });
 
         map.mapTypes.set('ortokuvat', ortoMapType);
@@ -1351,7 +1349,7 @@
           tileSize: new google.maps.Size(256, 256),
           maxZoom: 17,
           minZoom: 0,
-          name: 'OpenTopoMap'
+          name: 'OpenTopo'
         });
 
         map.mapTypes.set('opentopomap', opentopoMapType);
