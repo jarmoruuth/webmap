@@ -1,1772 +1,1812 @@
 <!DOCTYPE html>
 <html>
-  <head>
+
+<head>
     <title>Map</title>
     <link rel="icon" type="image/png" sizes="16x16" href="map-favicon.png">
     <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
     <meta charset="utf-8">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.4.4/proj4-src.js"></script>    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.4.4/proj4-src.js"></script>
     <style>
-      /* Always set the map height explicitly to define the size of the div
-       * element that contains the map. */
-      #map {
-        height: 100%;
-      }
-      /* Optional: Makes the sample page fill the window. */
-      html, body {
-        height: 100%;
-        margin: 0;
-        padding: 0;
-      }
+        /* Always set the map height explicitly to define the size of the div
+         * element that contains the map. 
+         */
+        #map {
+            height: 100%;
+        }
+
+        /* Optional: Makes the sample page fill the window. */
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
     </style>
-  </head>
-  <body>
+</head>
+
+<body>
     <div id="map"></div>
     <script charset="UTF-8">
-      // Note: This example requires that you consent to location sharing when
-      // prompted by your browser. If you see the error "The Geolocation service
-      // failed.", it means you probably did not give permission for the browser to
-      // locate you.
+        // Note: This example requires that you consent to location sharing when
+        // prompted by your browser. If you see the error "The Geolocation service
+        // failed.", it means you probably did not give permission for the browser to
+        // locate you.
 
-      var version = "0.45";
+        var version = "0.45";
 
-      var map;
-      var id, infoWindow, infoPopup, marker, options;
-      var infoBottomWindow, infoBottomWindowPos;
-      var nbasemaps;
-      var current_location = {lat: 60.2053791, lng: 24.6540694};          // Espoo
-      var autoMove = true;
-      var path = [];                // path of last positions
-      var maxpath = 180;            // max path points to save, three hours with once a minute save interval
-      var pathinterval = 60000;     // interval for storing path points, every minute, should be ok for walking
-      var recording_distance = 10;  // distance between points before we record a new one
-      var circle_radius = 5;
-      var centerMarker;
-      var url_markers = [];
-      var start_location = current_location;
-      var map_zoom = 15;
-      var start_maptypeid;
-      var layerDialog;
-      var layerDialogDiv;
-      var settingsDiv;
-      var coordinatesBox;
-      var mapLinkBox;
-      var kmlVersion = 6;
-      var mapInfoTextDiv;
-      var use_kapsi_maastokartat = false;
-      var use_kapsi_ortokuvat = true;
-      var opentopomap_site = 'a';
-      var measureDistanceMode = 0;
-      var measureDistancePath = null;
-      var measureDistanceLastPos = null;
-      var measureDistanceLength = 0;
-      var lastRightClickPos = null;
+        var map;
+        var id, infoWindow, infoPopup, marker, options;
+        var infoBottomWindow, infoBottomWindowPos;
+        var nbasemaps;
+        var current_location = { lat: 60.2053791, lng: 24.6540694 };          // Espoo
+        var autoMove = true;
+        var path = [];                // path of last positions
+        var maxpath = 180;            // max path points to save, three hours with once a minute save interval
+        var pathinterval = 60000;     // interval for storing path points, every minute, should be ok for walking
+        var recording_distance = 10;  // distance between points before we record a new one
+        var circle_radius = 5;
+        var centerMarker;
+        var url_markers = [];
+        var start_location = current_location;
+        var map_zoom = 15;
+        var start_maptypeid;
+        var layerDialog;
+        var layerDialogDiv;
+        var settingsDiv;
+        var coordinatesBox;
+        var mapLinkBox;
+        var kmlVersion = 6;
+        var mapInfoTextDiv;
+        var use_kapsi_maastokartat = false;
+        var use_kapsi_ortokuvat = true;
+        var opentopomap_site = 'a';
+        var measureDistanceMode = 0;
+        var measureDistancePath = null;
+        var measureDistanceLastPos = null;
+        var measureDistanceLength = 0;
+        var lastRightClickPos = null;
 
-      var layers = [
-                      { name : 'Lynx parenteesi',  visible : false,  type : 'kml', 
-                        url : 'https://ruuth.xyz/Lynx.kmz', 
-                        layer : null 
-                      },
-                      { name : 'Parenteesipisteet', visible : false, type : 'kml', 
-                        url : 'https://ruuth.xyz/ParenteesiKirja.kmz', 
-                        layer : null },
-                      { name : 'Parenteesikartat', visible : false, type : 'oldmaps', 
-                        url : null, 
-                        layer : null },    // Array of overlay layers
-                      { name : 'Planetskier', visible : false, type : 'kml', 
-                        url : 'https://planetskier.net/locations.kmz', 
-                        layer : null 
-                      },
-                      { name : 'Espoon lähiretkiä', visible : false, type : 'kml', 
-                        url : 'https://ruuth.xyz/EspoonLahiretkia.kml', 
-                        layer : null 
-                      },
-                      { name : 'Omat luolat', visible : false, type : 'kml', 
-                        url : 'https://ruuth.xyz/Omat_luolat.kmz', 
-                        layer : null 
-                      },
-                      { name : 'Maailmanperintökohteet', visible : false, type : 'kmlarray', 
-                        url : [ 'https://ruuth.xyz/maailmanperinto_kohteet_point.kml', 'https://ruuth.xyz/maailmanperinto_kohteet_region.kml' ],
-                        layer : null
-                      },
-                      { name : 'Muinaisjäännökset', visible : false, type : 'tiled_geojson', 
-                        url : '', 
-                        layer : null 
-                      },
-                      { name : 'Luolaseuran luolat', visible : false, type : 'activityjson', 
-                        url : 'https://ruuth.xyz/caves_new.luolaseura.json', 
-                        layer : null 
-                      },
-                      { name : 'Nimet 1 (luola)', visible : false, type : 'kml', 
-                        url : 'https://ruuth.xyz/Luolanimet.kml', 
-                        layer : null 
-                      },
-                      { name : 'Nimet 2 (kirkko, kellari, kolo)', visible : false, type : 'kml', 
-                        url : 'https://ruuth.xyz/kirkko_kellari_kolo.kml', 
-                        layer : null 
-                      },
-                      { name : 'Nimet 3 (piru, hiiden, kasaberget)', visible : false, type : 'kml', 
-                        url : 'https://ruuth.xyz/piru_hiiden_kasaberget.kml', 
-                        layer : null 
-                      },
-                      { name : 'Lintutornit',  visible : false,  type : 'kml', 
-                        url : 'https://ruuth.xyz/Lintutornit.kmz', 
-                        layer : null 
-                      },
-                      { name : 'Lintujen ruokintapaikkoja',  visible : false,  type : 'kml', 
-                        url : 'https://ruuth.xyz/Lintujen_ruokintapaikkoja.kmz', 
-                        layer : null 
-                      }
-                   ];
-      var maps = [
-                      { name : 'peruskartta', altnames : [ 'maasto', 'maastokartta' ], visible : true
-                      },
-                      { name : 'ortokuvat', altnames : [ 'ilma', 'ortoilmakuvat' ], visible : true
-                      },                      
-                      { name : 'opentopomap', altnames : [ 'opentopo' ], visible : false
-                      },                      
-                      { name : 'mapant', altnames : [ 'MapAnt' ], visible : false
-                      }
-                ];
-      var overlayMaps = [
-                      // Overlay map layout:
-                      //  1 2 3 4 5 6 7
-                      //  8
-                      { url : 'https://ruuth.xyz/DSCF2190-Edit-2.jpg',  // 1. ingels - kirkkonummi
-                        bounds : { north: 60.15787151807389, south: 60.10657910193598, 
-                                   east: 24.44434820064698, west: 24.37297998317872 }
-                      },
-                      { url : 'https://ruuth.xyz/DSCF2185-e.jpg',       // 2. kivenlahden silta
-                        bounds : { north: 60.171301050355815, south: 60.12108803588506, 
-                                   east: 24.641129811651545, west: 24.570043743920937 }
-                      },
-                      { url : 'https://ruuth.xyz/DSCF2193-e.jpg',       // 3. sepänkylä - gesterby
-                        bounds : { north: 60.164256098240266, south: 60.11263149154279, 
-                                   east: 24.49608264812623, west: 24.42540107616578 }
-                      },
-                      { url : 'https://ruuth.xyz/DSCF2195-e.jpg',       // 4. siuntio - billskog
-                        bounds : {  north: 60.1440304449622, south: 60.09340115006546, 
-                                    east: 24.25135789760743, west: 24.177586420861825 }
-                      },
-                      { url : 'https://ruuth.xyz/DSCF2197-e.jpg',       // 5. lappträsk - vikträsk
-                        bounds : { north: 60.15666031630041, south: 60.10555851363581, 
-                                   east: 24.333760176800485, west: 24.260675345562692 }
-                      },
-                      { url : 'https://ruuth.xyz/DSCF2199-e.jpg',       // 6. degerby
-                        bounds : { north: 60.101558497190446, south: 60.05298482371069, 
-                                   east: 24.183706675671335, west: 24.11388341059565 }
-                      },
-                      { url : 'https://ruuth.xyz/DSCF2181-e.jpg',       // 7. masala - sundberg
-                        bounds : { north: 60.18693484580627, south: 60.13539698286657, 
-                                   east: 24.578924020178157, west: 24.504766305334407 }
-                      },
-                      { url : 'https://ruuth.xyz/DSCF2202-e.jpg',       // 8. siggans
-                        bounds : { north: 60.141194955843204, south: 60.09062549367392, 
-                                   east: 24.172291194103952, west: 24.101609622143503 }
-                      }
-      ];
+        var layers = [
+            {
+                name: 'Lynx parenteesi', visible: false, type: 'kml',
+                url: 'https://ruuth.xyz/Lynx.kmz',
+                layer: null
+            },
+            {
+                name: 'Parenteesipisteet', visible: false, type: 'kml',
+                url: 'https://ruuth.xyz/ParenteesiKirja.kmz',
+                layer: null
+            },
+            {
+                name: 'Parenteesikartat', visible: false, type: 'oldmaps',
+                url: null,
+                layer: null
+            },    // Array of overlay layers
+            {
+                name: 'Planetskier', visible: false, type: 'kml',
+                url: 'https://planetskier.net/locations.kmz',
+                layer: null
+            },
+            {
+                name: 'Espoon lähiretkiä', visible: false, type: 'kml',
+                url: 'https://ruuth.xyz/EspoonLahiretkia.kml',
+                layer: null
+            },
+            {
+                name: 'Omat luolat', visible: false, type: 'kml',
+                url: 'https://ruuth.xyz/Omat_luolat.kmz',
+                layer: null
+            },
+            {
+                name: 'Maailmanperintökohteet', visible: false, type: 'kmlarray',
+                url: ['https://ruuth.xyz/maailmanperinto_kohteet_point.kml', 'https://ruuth.xyz/maailmanperinto_kohteet_region.kml'],
+                layer: null
+            },
+            {
+                name: 'Muinaisjäännökset', visible: false, type: 'tiled_geojson',
+                url: '',
+                layer: null
+            },
+            {
+                name: 'Luolaseuran luolat', visible: false, type: 'activityjson',
+                url: 'https://ruuth.xyz/caves_new.luolaseura.json',
+                layer: null
+            },
+            {
+                name: 'Nimet 1 (luola)', visible: false, type: 'kml',
+                url: 'https://ruuth.xyz/Luolanimet.kml',
+                layer: null
+            },
+            {
+                name: 'Nimet 2 (kirkko, kellari, kolo)', visible: false, type: 'kml',
+                url: 'https://ruuth.xyz/kirkko_kellari_kolo.kml',
+                layer: null
+            },
+            {
+                name: 'Nimet 3 (piru, hiiden, kasaberget)', visible: false, type: 'kml',
+                url: 'https://ruuth.xyz/piru_hiiden_kasaberget.kml',
+                layer: null
+            },
+            {
+                name: 'Lintutornit', visible: false, type: 'kml',
+                url: 'https://ruuth.xyz/Lintutornit.kmz',
+                layer: null
+            },
+            {
+                name: 'Lintujen ruokintapaikkoja', visible: false, type: 'kml',
+                url: 'https://ruuth.xyz/Lintujen_ruokintapaikkoja.kmz',
+                layer: null
+            }
+        ];
+        var maps = [
+            {
+                name: 'peruskartta', altnames: ['maasto', 'maastokartta'], visible: true
+            },
+            {
+                name: 'ortokuvat', altnames: ['ilma', 'ortoilmakuvat'], visible: true
+            },
+            {
+                name: 'opentopomap', altnames: ['opentopo'], visible: false
+            },
+            {
+                name: 'mapant', altnames: ['MapAnt'], visible: false
+            }
+        ];
+        var overlayMaps = [
+            // Overlay map layout:
+            //  1 2 3 4 5 6 7
+            //  8
+            {
+                url: 'https://ruuth.xyz/DSCF2190-Edit-2.jpg',  // 1. ingels - kirkkonummi
+                bounds: {
+                    north: 60.15787151807389, south: 60.10657910193598,
+                    east: 24.44434820064698, west: 24.37297998317872
+                }
+            },
+            {
+                url: 'https://ruuth.xyz/DSCF2185-e.jpg',       // 2. kivenlahden silta
+                bounds: {
+                    north: 60.171301050355815, south: 60.12108803588506,
+                    east: 24.641129811651545, west: 24.570043743920937
+                }
+            },
+            {
+                url: 'https://ruuth.xyz/DSCF2193-e.jpg',       // 3. sepänkylä - gesterby
+                bounds: {
+                    north: 60.164256098240266, south: 60.11263149154279,
+                    east: 24.49608264812623, west: 24.42540107616578
+                }
+            },
+            {
+                url: 'https://ruuth.xyz/DSCF2195-e.jpg',       // 4. siuntio - billskog
+                bounds: {
+                    north: 60.1440304449622, south: 60.09340115006546,
+                    east: 24.25135789760743, west: 24.177586420861825
+                }
+            },
+            {
+                url: 'https://ruuth.xyz/DSCF2197-e.jpg',       // 5. lappträsk - vikträsk
+                bounds: {
+                    north: 60.15666031630041, south: 60.10555851363581,
+                    east: 24.333760176800485, west: 24.260675345562692
+                }
+            },
+            {
+                url: 'https://ruuth.xyz/DSCF2199-e.jpg',       // 6. degerby
+                bounds: {
+                    north: 60.101558497190446, south: 60.05298482371069,
+                    east: 24.183706675671335, west: 24.11388341059565
+                }
+            },
+            {
+                url: 'https://ruuth.xyz/DSCF2181-e.jpg',       // 7. masala - sundberg
+                bounds: {
+                    north: 60.18693484580627, south: 60.13539698286657,
+                    east: 24.578924020178157, west: 24.504766305334407
+                }
+            },
+            {
+                url: 'https://ruuth.xyz/DSCF2202-e.jpg',       // 8. siggans
+                bounds: {
+                    north: 60.141194955843204, south: 60.09062549367392,
+                    east: 24.172291194103952, west: 24.101609622143503
+                }
+            }
+        ];
 
-      console.log('*** body ***');
+        console.log('*** body ***');
 
-      // check parameters from url
-      //
-      var url = new URL(window.location);
-      console.log(url);
-      var searchParams = new URLSearchParams(url.search.slice(1));
+        // check parameters from url
+        //
+        var url = new URL(window.location);
+        console.log(url);
+        var searchParams = new URLSearchParams(url.search.slice(1));
 
-      // check kml parameters for a new layers
-      // kml=<url>,<name>[,<visible if != 0>]
-      //
-      var kmlparams = searchParams.getAll('kml');
-      for (var i = 0; i < kmlparams.length; i++) {
-        var kml = kmlparams[i];
-        console.log('kml param['+i+']='+kml);
-        var newlayer = {};
-        var newvalues = kml.split(',');
-        console.log('newvalues=', newvalues);
-        if (newvalues[0] && newvalues[1]) {
-          console.log('add new kml layer, newvalues=', newvalues);
-          newlayer.type = 'kml';
-          newlayer.url = newvalues[0];
-          newlayer.name = newvalues[1];
-          if (newvalues[2]) {
-            newlayer.visible = Number(newvalues[2]);
-          } else {
-            newlayer.visible = false;
-          }
-          newlayer.layer = null;
-          layers[layers.length] = newlayer;
-        } else {
-          console.log('new kml layer needs url and name, newvalues=', newvalues);            
+        // check kml parameters for a new layers
+        // kml=<url>,<name>[,<visible if != 0>]
+        //
+        var kmlparams = searchParams.getAll('kml');
+        for (var i = 0; i < kmlparams.length; i++) {
+            var kml = kmlparams[i];
+            console.log('kml param[' + i + ']=' + kml);
+            var newlayer = {};
+            var newvalues = kml.split(',');
+            console.log('newvalues=', newvalues);
+            if (newvalues[0] && newvalues[1]) {
+                console.log('add new kml layer, newvalues=', newvalues);
+                newlayer.type = 'kml';
+                newlayer.url = newvalues[0];
+                newlayer.name = newvalues[1];
+                if (newvalues[2]) {
+                    newlayer.visible = Number(newvalues[2]);
+                } else {
+                    newlayer.visible = false;
+                }
+                newlayer.layer = null;
+                layers[layers.length] = newlayer;
+            } else {
+                console.log('new kml layer needs url and name, newvalues=', newvalues);
+            }
         }
-      }
 
-      // check path parameters
-      // path=<max path points>[,<interval in seconds>[,<recording distance in meters>]]
-      // path=0 disables path printing
-      //
-      var pathparams = searchParams.get('path');
-      if (pathparams) {
-        var newvalues = pathparams.split(',');
-        if (newvalues[0]) {
-          maxpath = Number(newvalues[0]);
-          console.log('new maxpath='+maxpath);
+        // check path parameters
+        // path=<max path points>[,<interval in seconds>[,<recording distance in meters>]]
+        // path=0 disables path printing
+        //
+        var pathparams = searchParams.get('path');
+        if (pathparams) {
+            var newvalues = pathparams.split(',');
+            if (newvalues[0]) {
+                maxpath = Number(newvalues[0]);
+                console.log('new maxpath=' + maxpath);
+            }
+            if (newvalues[1]) {
+                pathinterval = Number(newvalues[1]) * 1000;
+                console.log('pathinterval=' + pathinterval);
+            }
+            if (newvalues[2]) {
+                recording_distance = Number(newvalues[2]);
+                console.log('recording_distance=' + recording_distance);
+            }
         }
-        if (newvalues[1]) {
-          pathinterval = Number(newvalues[1]) * 1000;
-          console.log('pathinterval='+pathinterval);
-        }
-        if (newvalues[2]) {
-          recording_distance = Number(newvalues[2]);
-          console.log('recording_distance='+recording_distance);
-        }
-      }
 
-      // check map center from url
-      var centerparams = searchParams.get('center');
-      if (centerparams) {
-        console.log('centerparams='+centerparams);
-        var newvalues = centerparams.split(',');
-        var urlPos = {
-              lat: Number(newvalues[0]),
-              lng: Number(newvalues[1])
-        };
-        var urlMarker = {
-              pos : urlPos,
-              label : newvalues[2] ? newvalues[2] : 'C'
-        };
-        url_markers[url_markers.length] = urlMarker;
+        // check map center from url
+        var centerparams = searchParams.get('center');
+        if (centerparams) {
+            console.log('centerparams=' + centerparams);
+            var newvalues = centerparams.split(',');
+            var urlPos = {
+                lat: Number(newvalues[0]),
+                lng: Number(newvalues[1])
+            };
+            var urlMarker = {
+                pos: urlPos,
+                label: newvalues[2] ? newvalues[2] : 'C'
+            };
+            url_markers[url_markers.length] = urlMarker;
+            if (!sessionStorage.getItem('Lat')) {
+                // not saved center, get from url
+                start_location = urlPos;
+                autoMove = false;
+            }
+        }
+
+        // check markers from url
+        var markerparams = searchParams.getAll('marker');
+        for (var i = 0; i < markerparams.length; i++) {
+            console.log('markerparams=' + markerparams[i]);
+            var params = markerparams[i];
+            var newvalues = params.split(',');
+            var urlPos = {
+                lat: Number(newvalues[0]),
+                lng: Number(newvalues[1])
+            };
+            var urlMarker = {
+                pos: urlPos,
+                label: newvalues[2] ? newvalues[2] : 'M'
+            };
+            url_markers[url_markers.length] = urlMarker;
+        }
+
+        // check visible layers
         if (!sessionStorage.getItem('Lat')) {
-          // not saved center, get from url
-          start_location = urlPos;
-          autoMove = false;
-        }
-      }
-
-      // check markers from url
-      var markerparams = searchParams.getAll('marker');
-      for (var i = 0; i < markerparams.length; i++)  {
-        console.log('markerparams='+markerparams[i]);
-        var params = markerparams[i];
-        var newvalues = params.split(',');
-        var urlPos = {
-              lat: Number(newvalues[0]),
-              lng: Number(newvalues[1])
-        };
-        var urlMarker = {
-              pos : urlPos,
-              label : newvalues[2] ? newvalues[2] : 'M'
-        };
-        url_markers[url_markers.length] = urlMarker;        
-      }      
-
-      // check visible layers
-      if (!sessionStorage.getItem('Lat')) {
-        // no saved data, get from url
-        var layersparams = searchParams.get('layers');
-        if (layersparams) {
-          console.log('layersparams='+layersparams);
-          var newvalues = layersparams.split(',');
-          for (var i = 0; i < newvalues.length; i++) {
-            for (var j = 0; j < layers.length; j++) {
-              if (layers[j].name == newvalues[i])  {
-                console.log('set visible, layer='+layers[j].name);
-                layers[j].visible = true;
-              }
-            }
-          }
-        }
-        var mapsparams = searchParams.get('maps');
-        if (mapsparams) {
-          mapsSetVisible(mapsparams.split(','));
-        }
-      }
-
-      restoreState(true);
-
-      // ------------------------------------------------------------
-      // save current state to session storage
-
-      function saveBool(name, val) {
-        if (val) {
-          sessionStorage.setItem(name, String('1'));          
-        } else {
-          sessionStorage.setItem(name, String('0'));
-        }
-      }
-
-      function saveState() {
-        var visible_layers = '';
-        var map_center = map.getCenter();
-        console.log("saveState:lat="+map_center.lat()+",lng="+map_center.lng()+',Zoom='+map.getZoom()+'MapTypeId='+map.getMapTypeId()
-                     +'AutoMove='+autoMove);
-        sessionStorage.setItem('Lat', String(map_center.lat()));
-        sessionStorage.setItem('Lng', String(map_center.lng()));
-        sessionStorage.setItem('Zoom', String(map.getZoom()));
-        sessionStorage.setItem('MapTypeId', map.getMapTypeId());
-        if (kmlVersion) {
-          sessionStorage.setItem('kmlVersion', kmlVersion);
-        } else {
-          sessionStorage.removeItem('kmlVersion');          
-        }
-        console.log("saveState:autoMove="+autoMove);
-        saveBool('AutoMove', autoMove);
-        for (var i = 0; i < layers.length; i++) {
-          if (layers[i].visible) {
-            visible_layers = visible_layers + layers[i].name + ',';
-          }
-        }
-        console.log(visible_layers);
-        sessionStorage.setItem('VisibleLayers', visible_layers);
-        var visible_maps = '';
-        for (var i = 0; i < maps.length; i++) {
-          if (maps[i].visible) {
-            visible_maps = visible_maps + maps[i].name + ' ';
-          }
-        }
-        console.log(visible_maps);
-        sessionStorage.setItem('VisibleMaps', visible_maps);
-        if (path.length > 0) {
-          var save_path = '';
-          for (var i = 0; i < path.length; i++) {
-            var pos = path[i].getCenter();
-            var posJSON = pos.toJSON();
-            save_path = save_path + JSON.stringify(posJSON) + ' ';
-          }
-          //alert(save_path);
-          sessionStorage.setItem('Path', save_path);
-        }
-      }
-
-      // ------------------------------------------------------------
-      // restore current state from session storate
-
-      function restoreBool(name) {
-        var num = Number(sessionStorage.getItem(name));
-          if (num) {
-            return true;
-          } else {
-            return false;
-          }
-      }
-
-      function restoreState(atStart) {
-        if (sessionStorage.getItem('AutoMove')) {
-          autoMove = restoreBool('AutoMove');
-          if (centerMarker) {
-            centerMarker.setVisible(!autoMove);
-          }
-          console.log("restoreState:autoMove="+autoMove);
-        } else {
-          console.log("restoreState:could not restore autoMove");
-        }
-        if (sessionStorage.getItem('Lat') 
-            && sessionStorage.getItem('Lng')
-            && sessionStorage.getItem('Zoom')
-            && sessionStorage.getItem('MapTypeId')) 
-        {
-          var pos = {
-                lat: Number(sessionStorage.getItem('Lat')),
-                lng: Number(sessionStorage.getItem('Lng'))
-          };
-          start_location = pos;
-          console.log("restoreState:lat="+pos.lat+",lng="+pos.lng+
-                      ',Zoom='+sessionStorage.getItem('Zoom')+
-                      ',MapTypeId='+sessionStorage.getItem('MapTypeId'));
-          start_maptypeid = sessionStorage.getItem('MapTypeId');       
-          map_zoom = Number(sessionStorage.getItem('Zoom'));
-          if (map) {
-            map.setMapTypeId(start_maptypeid);
-            map.setZoom(map_zoom);
-            map.panTo(pos);
-          }
-          updateCircleRadius(map_zoom);
-        } else {
-          console.log("restoreState:could not restore lat,lng,Zoom,MapTypeId");          
-        }
-        if (sessionStorage.getItem('kmlVersion')) {
-          kmlVersion = sessionStorage.getItem('kmlVersion');
-        }
-        if (sessionStorage.getItem('VisibleLayers')) {
-          var visible_layers = sessionStorage.getItem('VisibleLayers').split(',');
-          console.log('visible_layers='+visible_layers);
-          for (var i = 0; i < visible_layers.length; i++) {
-              for (var j = 0; j < layers.length; j++) {
-                if (visible_layers[i] == layers[j].name) {
-                  layers[j].visible = true;
+            // no saved data, get from url
+            var layersparams = searchParams.get('layers');
+            if (layersparams) {
+                console.log('layersparams=' + layersparams);
+                var newvalues = layersparams.split(',');
+                for (var i = 0; i < newvalues.length; i++) {
+                    for (var j = 0; j < layers.length; j++) {
+                        if (layers[j].name == newvalues[i]) {
+                            console.log('set visible, layer=' + layers[j].name);
+                            layers[j].visible = true;
+                        }
+                    }
                 }
-              }
-          }
-        } else {
-          console.log('restoreState:could not restore VisibleLayers');
-        }
-        if (sessionStorage.getItem('VisibleMaps')) {
-          var visible_maps = sessionStorage.getItem('VisibleMaps').split(' ');
-          console.log(visible_maps);
-          mapsSetVisible(visible_maps);
-        } else {
-          console.log('restoreState:could not restore VisibleLayers');
-        }        
-        if (!atStart) {
-          if (sessionStorage.getItem('Path')) {
-            var saved_path = sessionStorage.getItem('Path').split(' ');
-            console.log(saved_path);
-            for (var i = 0; i < saved_path.length && saved_path[i].length > 5; i++) {
-              console.log('saved_path['+i+']='+saved_path[i]);
-              var json = JSON.parse(saved_path[i]);
-              path[path.length] = pathCircle({
-                                      lat: json['lat'],
-                                      lng: json['lng']
-                                    });
             }
-          } else {
-            console.log('restoreState:could not restore Path');
-          }
-        }
-      }
-
-      function mapsSetVisible(visible_maps) {
-        console.log("mapsSetVisible, visible_maps="+visible_maps);
-        for (var j = 0; j < maps.length; j++) {
-          maps[j].visible = false;
-        }
-        for (var i = 0; i < visible_maps.length; i++) {
-            for (var j = 0; j < maps.length; j++) {
-              let set_visible = false;
-              if (visible_maps[i] == maps[j].name) {
-                set_visible = true;
-              } else {
-                for (let k = 0; k < maps[j].altnames.length; k++) {
-                  if (visible_maps[i] == maps[j].altnames[k]) {
-                    set_visible = true;
-                    break;
-                  }
-                }
-              }
-              if (set_visible) {
-                console.log("set map " + maps[j].name + " visible");
-                maps[j].visible = true;
-              }
+            var mapsparams = searchParams.get('maps');
+            if (mapsparams) {
+                mapsSetVisible(mapsparams.split(','));
             }
         }
-      }
 
-      // ------------------------------------------------------------
-      // load layer
+        restoreState(true);
 
-      function loadLayer(layer) {
+        // ------------------------------------------------------------
+        // save current state to session storage
 
-        if (!layer.layer) {
+        function saveBool(name, val) {
+            if (val) {
+                sessionStorage.setItem(name, String('1'));
+            } else {
+                sessionStorage.setItem(name, String('0'));
+            }
+        }
 
-          if (layer.type == 'kml') {
-            console.log("loadLayer:create new kml layer, layer=", layer.name);
-            var layerUrl = layer.url;
+        function saveState() {
+            var visible_layers = '';
+            var map_center = map.getCenter();
+            console.log("saveState:lat=" + map_center.lat() + ",lng=" + map_center.lng() + ',Zoom=' + map.getZoom() + 'MapTypeId=' + map.getMapTypeId()
+                + 'AutoMove=' + autoMove);
+            sessionStorage.setItem('Lat', String(map_center.lat()));
+            sessionStorage.setItem('Lng', String(map_center.lng()));
+            sessionStorage.setItem('Zoom', String(map.getZoom()));
+            sessionStorage.setItem('MapTypeId', map.getMapTypeId());
             if (kmlVersion) {
-              layerUrl += '?ver=' + kmlVersion;
-              console.log("loadLayer:layer url with version=", layerUrl);
-            }
-            try {
-              layer.layer = new google.maps.KmlLayer(layerUrl, {
-                  preserveViewport: true,
-                  suppressInfoWindows: false,
-                  map: map
-              });
-            } catch (error) {
-              console.log(error.message);
-            }
-
-          } else if (layer.type == 'oldmaps') {
-            console.log("loadLayer:create new oldmaps layer, layer=", layer.name);
-            layer.layer = [];
-            for (var i = 0; i < overlayMaps.length; i++) {
-              var newOverlay = new google.maps.GroundOverlay(
-                                                  overlayMaps[i].url,
-                                                  overlayMaps[i].bounds);
-              layer.layer[layer.layer.length] = newOverlay;
-            }
-
-          } else if (layer.type == 'tiled_geojson') {
-            console.log("loadLayer:tiled_geojson, nothing to do");
-
-          } else if (layer.type == 'activityjson') {
-            console.log("loadLayer:ActivityJSON, layer", layer.name);
-            loadActivityJSON(layer);
-            return false;
-
-          } else if (layer.type == 'kmlarray') {
-            console.log("loadLayer:create new kml array layer, layer=", layer.name);
-            layer.layer = [];
-            for (var i = 0; i < layer.url.length; i++)
-              layer.layer[i] = new google.maps.KmlLayer(layer.url[i], {
-                  preserveViewport: true,
-                  suppressInfoWindows: false
-              });
-          } else {
-            console.log("loadLayer:error, unknown layer, layer=", layer.name);
-          }
-        } else {
-          console.log("loadLayer:layer already loaded, layer=", layer.name);
-        }
-        return true;
-      }
-
-      // ------------------------------------------------------------
-      // ActivityJSON layer load/show/hide
-
-      function addRowActivityJSON(name, value, is_url) {
-        if (value == null || value == undefined)  {
-          return '';
-        }
-        if (is_url) {
-          return "<tr><td>" + name + "</td><td><a href=" + value + ">Kartta</a></td></tr>";
-        } else {
-          return "<tr><td>" + name + "</td><td>" + value + "</td></tr>";
-        }
-      }
-
-      function loadActivityJSON(layer) {
-        console.log('loadActivityJSON:start fetch');
-        fetch(layer.url)
-        .then(response => response.json())
-        .then (json => {
-          console.log('loadActivityJSON:process json');
-          js = json.features;
-          //console.log('loadActivityJSON:js', js);
-          console.log('loadActivityJSON:js len', js.length);
-          var markers = [];
-          for (var i = 0; i < js.length; i++) {
-            var infotxt = "<table>"+
-                          addRowActivityJSON("Nimi", js[i].properties.n, false) +
-                          addRowActivityJSON("Pituus",  js[i].properties.l, false) +
-                          addRowActivityJSON("Kirjaaja", js[i].properties.rl[0].w, false) +
-                          addRowActivityJSON("Kartta", js[i].properties.m, true) +
-                          "</table>"+
-                          "<br><a href="+js[i].properties.rl[0].u+">Lisätietoja</a>";
-            const marker = new google.maps.Marker({
-                                position: { lat: js[i].geometry.coordinates[0], lng: js[i].geometry.coordinates[1] },
-                                map: map, 
-                                title: js[i].properties.n,
-                                info: infotxt,
-                                icon: {                             
-                                  url: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png"
-                                }
-                            });
-            marker.addListener("click", () => {
-              infoWindow.setContent(marker.info);
-              infoWindow.open(map, marker);
-            });
-            markers.push(marker);
-          }
-          console.log('loadActivityJSON:layer elements', markers.length);
-          layer.layer = markers;
-        })
-        .catch (err => console.error(err))
-      }
-
-      function showActivityJSON(layer) {
-        if (layers == null) {
-          console.log('showActivityJSON:null layer');
-        } else {
-          console.log('showActivityJSON:layer elements', layer.length);
-          for (var i = 0; i < layer.length; i++) {
-            layer[i].setMap(map);
-          }
-        }
-      }
-
-      function hideActivityJSON(layer) {
-        for (var i = 0; i < layer.length; i++) {
-          layer[i].setMap(null);
-        }
-      }
-
-      // ------------------------------------------------------------
-      // Tiled Geojson layer show/hide
-
-      var tiled_geojson_tilenames = [];
-      var tiled_geojson_visible = false;
-      var tiled_geojson_listener = null;
-      var tiled_geojson_bounds_changed = false;
-      var tiled_geojson_zoom = 12;
-
-      function fix_order(arr2) {
-          if (arr2[0] > arr2[1]) {
-            return [arr2[1], arr2[0]];
-          } else {
-            return arr2;
-          }
-      }
-
-      function cleanupProperty(prop) {
-        if (prop != undefined) {
-          prop = prop.toString().trim();
-          if(prop.charAt(prop.length-1) == ",") {
-            prop = prop.slice(0, -1)
-          }
-        }
-        return prop;
-      }
-
-      function getTiledGeojsonHtml(feat, name) {
-        var prop = cleanupProperty(feat.getProperty(name));
-        if (prop == undefined) {
-          return "";
-        }
-        if (name == "Mjtunnus") {
-          name = "More info";
-          prop = "<a href=https://www.kyppi.fi/palveluikkuna/mjreki/read/asp/r_kohde_det.aspx?KOHDE_ID="+prop+">Museovirasto</a>"
-        }
-        return "<tr><td>" + name + "</td><td>" + prop + "</td></tr>";
-      }
-
-      // Tile functions from:
-      // https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames
-      function long2tile(lon,zoom) { return (Math.floor((lon+180)/360*Math.pow(2,zoom))); }
-      function lat2tile(lat,zoom)  { return (Math.floor((1-Math.log(Math.tan(lat*Math.PI/180) + 1/Math.cos(lat*Math.PI/180))/Math.PI)/2 *Math.pow(2,zoom))); }
-
-      function showTiledGeojsonLayer() {
-        
-        tiled_geojson_visible = true;
-
-        if (!tiled_geojson_bounds_changed) {
-          console.log("showTiledGeojsonLayer:!tiled_geojson_bounds_changed");
-          return;
-        }
-
-        // calculate tiles
-        console.log("showTiledGeojsonLayer:calculate tiles");
-        if (typeof map.getBounds !== 'function') {
-          console.log("showTiledGeojsonLayer:map.getBounds not available");
-          return;
-        }
-        var bounds = map.getBounds();
-        //console.log("showTiledGeojsonLayer:bounds", bounds.getNorthEast().lat(), bounds.getNorthEast().lng(), bounds.getSouthWest().lat(), bounds.getSouthWest().lng());
-        //console.log("showTiledGeojsonLayer:current_location", current_location, long2tile(current_location.lng, tiled_geojson_zoom), lat2tile(current_location.lat, tiled_geojson_zoom));
-        var bounds_x = [
-          long2tile(bounds.getNorthEast().lng(), tiled_geojson_zoom),
-          long2tile(bounds.getSouthWest().lng(), tiled_geojson_zoom)
-        ];
-        var bounds_y = [
-          lat2tile(bounds.getNorthEast().lat(), tiled_geojson_zoom),
-          lat2tile(bounds.getSouthWest().lat(), tiled_geojson_zoom)
-        ];
-        bounds_x = fix_order(bounds_x);
-        bounds_y = fix_order(bounds_y);
-        bounds_x[1] = bounds_x[1] + 1;
-        bounds_y[1] = bounds_y[1] + 1;
-        console.log("showTiledGeojsonLayer:bounds_x", bounds_x, "bounds_y", bounds_y);
-        var new_tiles = [];
-        var new_tile_xy = [];
-        for (var x = bounds_x[0]; x < bounds_x[1]; x++) {
-          for (var y = bounds_y[0]; y < bounds_y[1]; y++) {
-            //console.log("showTiledGeojsonLayer:x", x, "y", y);
-            new_tiles[new_tiles.length] = x.toString() + '_' + y.toString();
-            new_tile_xy[new_tile_xy.length] = [x, y];
-            //console.log("showTiledGeojsonLayer:tile", new_tiles[new_tiles.length-1]);
-          }
-        }
-        console.log("showTiledGeojsonLayer:new_tiles", new_tiles);
-
-        // find tiles that need to be loaded and tiles
-        // that can be removed
-        //console.log("showTiledGeojsonLayer:show new tiles", new_tiles.length);
-        for (var i = 0; i < new_tiles.length; i++) {
-          var found_tile = false;
-          for (var j = 0; j < tiled_geojson_tilenames.length; j++) {
-            if (tiled_geojson_tilenames[j] == new_tiles[i]) {
-              // tile is already visible, set it to null
-              // so we do not remove it
-              console.log("showTiledGeojsonLayer:visible tile", new_tiles[i]);
-              tiled_geojson_tilenames[j] = '';
-              found_tile = true;
-              break;
-            }
-          }
-          if (!found_tile) {
-            console.log("showTiledGeojsonLayer:load tile " + new_tiles[i]);
-            var xy = new_tile_xy[i];
-            var url = 'https://ruuth.xyz/tiles/' + xy[0].toString() + '/tile_' + xy[1].toString() + '.geojson';
-            console.log("showTiledGeojsonLayer:load tile " + new_tiles[i] + " url " + url);
-            map.data.loadGeoJson(url);
-          }
-        }
-        console.log("showTiledGeojsonLayer:old tiled_geojson_tilenames", tiled_geojson_tilenames);
-        
-        // remove those tiles that are not part of current view
-        console.log("showTiledGeojsonLayer:remove out-of-area tiles", tiled_geojson_tilenames.length);
-        for (var j = 0; j < tiled_geojson_tilenames.length; j++) {
-          if (tiled_geojson_tilenames[j] != '') {
-            //console.log("showTiledGeojsonLayer:check for remove tile " + tiled_geojson_tilenames[j]);
-            map.data.forEach(function (feature) {
-              tilename = feature.getProperty('tile');
-              //console.log("showTiledGeojsonLayer:feature tile " + tilename);
-              if (tilename == tiled_geojson_tilenames[j]) {
-                //console.log("showTiledGeojsonLayer:remove tile " + tilename);
-                map.data.remove(feature);
-              }
-            });
-          }
-        }
-        tiled_geojson_tilenames = new_tiles;
-        if (tiled_geojson_listener == null) {
-          tiled_geojson_listener = map.data.addListener('click', function(event) {
-                              var feat = event.feature;
-                              var html = "<table>" +
-                                          getTiledGeojsonHtml(feat, "Kohdenimi") +
-                                          getTiledGeojsonHtml(feat, "Ajoitus") +
-                                          getTiledGeojsonHtml(feat, "Tyyppi") +
-                                          getTiledGeojsonHtml(feat, "Alatyyppi") +
-                                          getTiledGeojsonHtml(feat, "Laji") +
-                                          getTiledGeojsonHtml(feat, "Tuhoutunut") +
-                                          getTiledGeojsonHtml(feat, "Luontipvm") +
-                                          getTiledGeojsonHtml(feat, "Muutospvm") +
-                                          getTiledGeojsonHtml(feat, "Vedenalain") +
-                                          getTiledGeojsonHtml(feat, "Mjtunnus") +
-                                          "</table>";
-                              infoPopup.close();
-                              infoWindow.close();
-                              infoWindow.setContent(html);
-                              infoWindow.setPosition(event.latLng);
-                              infoWindow.setOptions({pixelOffset: new google.maps.Size(0,-34)});
-                              infoWindow.open(map);
-                            });
-          // Set mouseover event for each feature.
-          map.data.addListener('mouseover', function(event) {
-            var infostr = cleanupProperty(event.feature.getProperty('Tyyppi'));
-            if (infostr == undefined) {
-              infostr = cleanupProperty(event.feature.getProperty('Kohdenimi'));
+                sessionStorage.setItem('kmlVersion', kmlVersion);
             } else {
-              var alatyyppi = cleanupProperty(event.feature.getProperty('Alatyyppi'));
-              if (alatyyppi != undefined) {
-                infostr = infostr + ', ' + alatyyppi;
-              }
+                sessionStorage.removeItem('kmlVersion');
             }
-            if (infostr == undefined) {
-              infostr = "No info";
-            }
-            infoPopup.close();
-            infoPopup.setContent(infostr);
-            infoPopup.setPosition(event.latLng);
-            infoPopup.setOptions({pixelOffset: new google.maps.Size(0,-34)});
-            infoPopup.open(map);
-          });
-        }
-        map.data.addListener('mouseout', function(event) {
-          infoPopup.close();
-        });
-        console.log("showTiledGeojsonLayer:done");
-      }
-
-      function hideTiledGeojsonLayer() {
-        console.log("hideTiledGeojsonLayer");
-        map.data.forEach(function (feature) {
-          map.data.remove(feature);
-        });
-        tiled_geojson_tilenames = [];
-        tiled_geojson_visible = false;
-      }
-
-      function updateTiledGeojsonLayer() {
-        console.log("updateTiledGeojsonLayer");
-        tiled_geojson_bounds_changed = true;
-        if (!tiled_geojson_visible) {
-          console.log("updateTiledGeojsonLayer:not visible");
-          return;
-        }
-        console.log('map.getZoom()', map.getZoom(),  'tiled_geojson_zoom', tiled_geojson_zoom);
-        if (map.getZoom() >= 10) {
-          showTiledGeojsonLayer();
-        } else {
-          // if we zoom out too much do not show 
-          // tiled_geojson points
-          //hideTiledGeojsonLayer();
-          tiled_geojson_visible = true;
-        }
-      }
-
-      // ------------------------------------------------------------
-      // Handle layer show/hide
-
-      function showLayer(layer) {
-          console.log("showLayer:layer=", layer.name);
-          var complete = loadLayer(layer);
-          if (map && complete) {
-            if (layer.type == 'oldmaps') {
-              for (var i = 0; i< layer.layer.length; i++) {
-                layer.layer[i].setMap(map);
-              }            
-            } else if (layer.type == 'kml') {
-              layer.layer.setMap(map);
-            } else if (layer.type == 'activityjson') {
-              showActivityJSON(layer.layer);
-            } else if (layer.type == 'kmlarray') {
-              for (var i = 0; i < layer.layer.length; i++) {
-                layer.layer[i].setMap(map);
-              }
-            } else if (layer.type == 'tiled_geojson') {
-              showTiledGeojsonLayer();
-            }
-          }
-      }
-
-      function hideLayer(layer) {
-        console.log("hideLayer:layer=", layer.name);
-          if (map) {
-            if (layer.type == 'oldmaps') {
-              for (var i = 0; i < layer.layer.length; i++) {
-                layer.layer[i].setMap(null);
-              }            
-            } else if (layer.type == 'activityjson') {
-              hideActivityJSON(layer.layer);
-            } else if (layer.type == 'kml') {
-              layer.layer.setMap(null);
-            } else if (layer.type == 'kmlarray') {
-              for (var i = 0; i < layer.layer.length; i++) {
-                layer.layer[i].setMap(null);
-              }
-            } else if (layer.type == 'tiled_geojson') {
-              hideTiledGeojsonLayer();
-            }
-          }
-      }
-
-      function showVisibleLayers() {
-        for (var i = 0; i < layers.length; i++) {
-          if (layers[i].visible) {            
-            showLayer(layers[i]);
-          }
-        }
-      }
-
-      function handleLayer(layer, show) {
-        if (show == layer.visible) {
-          // no change
-          console.log("handleLayer:no change, layer=", layer.name);
-          return;
-        }
-        layer.visible = show;
-        if (show) {
-          showLayer(layer);
-        } else {
-          hideLayer(layer);
-        }
-      }
-
-      // ------------------------------------------------------------
-      // Calculate circle radious based on map zoom
-
-      function updateCircleRadius(zoom) {
-        if (zoom >= 17) {
-          circle_radius = 20 - zoom;
-          if (circle_radius < 0.5) {
-            circle_radius = 0.5;
-          }
-        } else {
-          circle_radius = 5;
-        }
-        console.log('updateCircleRadius:zoom='+zoom+',circle_radius='+circle_radius);        
-      }
-
-      // ------------------------------------------------------------
-      // Init map
-
-      function initMap() {
-        var checkBox;
-
-        if (!start_maptypeid) {
-          start_maptypeid = google.maps.MapTypeId.ROADMAP;
-        }
-
-        // initMap: proj4 settings
-
-        // ETRS-TM35FIN (EPSG:3067)
-        proj4.defs("ETRS-TM35FIN", "+proj=utm +zone=35 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs");
-        // ETRS-GK25 (EPSG:3879)
-        proj4.defs("ETRS-GK25", "+proj=tmerc +lat_0=0 +lon_0=25 +k=1 +x_0=25500000 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs");
-
-        // initMap: create map
-
-        map = new google.maps.Map(document.getElementById('map'), {
-          center: start_location,
-          zoom : map_zoom,
-          mapTypeId : start_maptypeid,
-          mapTypeControlOptions: {
-            mapTypeIds: [
-                google.maps.MapTypeId.ROADMAP,
-                google.maps.MapTypeId.SATELLITE,
-                google.maps.MapTypeId.HYBRID
-            ]
-          }
-        });
-
-        // Geojson marker style
-        map.data.setStyle(function(feature) {
-          return({
-            icon: {
-              url: "https://maps.google.com/mapfiles/ms/icons/green-dot.png"
-            }
-          });
-        });
-
-        nbasemaps = map.mapTypeControlOptions.mapTypeIds.length;
-        setVisibleMaps();
-
-        function setVisibleMaps() {
-          var n = nbasemaps;
-          var current_nmaps = map.mapTypeControlOptions.mapTypeIds.length;
-          for (var i = 0; i < maps.length; i++) {
-            if (maps[i].visible) {
-              map.mapTypeControlOptions.mapTypeIds[n] = maps[i].name;
-              n++;
-            }
-          }
-          // clear old names
-          for (var i = n; i < current_nmaps; i++) {
-            map.mapTypeControlOptions.mapTypeIds[i] = null;
-          }
-        }
-
-        map.addListener('bounds_changed', function() {
-          var bounds = map.getBounds();
-          var northEast = bounds.getNorthEast();
-          var southWest = bounds.getSouthWest();
-          infoBottomWindowPos = new google.maps.LatLng(southWest.lat(), southWest.lng()+(northEast.lng()-southWest.lng())/2);
-          if (measureDistanceMode != 0) {
-              infoBottomWindow.setPosition(infoBottomWindowPos);
-              infoBottomWindow.open(map);
-          }
-          
-          updateTiledGeojsonLayer();
-        });
-
-        // initMap: show markers listed in url
-
-        for (var i = 0; i < url_markers.length; i++) {
-          console.log('show markes, pos='+url_markers[i].pos+',label='+url_markers[i].label);
-          var marker = new google.maps.Marker({
-            position: url_markers[i].pos,
-            map: map,
-            title: 'Url marker',
-            label: url_markers[i].label,
-            icon: {
-              url: "https://maps.google.com/mapfiles/ms/icons/yellow-dot.png"
-            }
-          });
-        }
-
-        // ------------------------------------------------------------
-        // initMap: Dialog  menu to chose layers, with dialog menu multiple
-        // layers can be visible at the same time
-
-        layerDialogDiv = document.createElement("div");
-        //document.body.appendChild(layerDialogDiv);
-
-        // Create check box for all layers
-        for (var i = 0; i < layers.length; i++) {
-          checkBox = document.createElement("INPUT");
-          checkBox.setAttribute("type", "checkbox");
-          checkBox.value = layers[i].name;
-          checkBox.checked = layers[i].visible;
-          checkBox.onclick = function() {
-            console.log("layerDialog clicked, name=" + this.value + ",checked=", this.checked);
+            console.log("saveState:autoMove=" + autoMove);
+            saveBool('AutoMove', autoMove);
             for (var i = 0; i < layers.length; i++) {
-              if (layers[i].name == this.value) {
-                handleLayer(layers[i], this.checked);
-              }
-            }
-          };
-          layerDialogDiv.appendChild(checkBox);
-          layerDialogDiv.appendChild(document.createTextNode(layers[i].name));
-          layerDialogDiv.appendChild(document.createElement("BR"));            
-        }
-
-        // Close button
-        var layerCloseButton = document.createElement("BUTTON");
-        layerCloseButton.appendChild(document.createTextNode("Close"));
-        layerCloseButton.onclick = function(){
-          console.log("layerDialog Close clicked");
-          infoWindow.close();
-          infoPopup.close();
-        };
-        layerDialogDiv.appendChild(layerCloseButton);
-
-        // ------------------------------------------------------------
-        // initMap: Settings dialog  menu
-
-        settingsDiv = document.createElement("div");
-        //document.body.appendChild(settingsDiv);
-
-        settingsDiv.appendChild(document.createTextNode('Version ' + version));
-        settingsDiv.appendChild(document.createElement("BR"));
-
-        settingsDiv.appendChild(document.createElement("BR"));
-        settingsDiv.appendChild(document.createTextNode('Center coordinates:'));
-        settingsDiv.appendChild(document.createElement("BR"));
-        coordinatesBox = document.createElement("INPUT");
-        coordinatesBox.setAttribute("type", "text");
-        settingsDiv.appendChild(coordinatesBox);
-        settingsDiv.appendChild(document.createElement("BR"));
-
-        settingsDiv.appendChild(document.createTextNode('Map link to center coordinates:'));
-        settingsDiv.appendChild(document.createElement("BR"));
-        mapLinkBox = document.createElement("INPUT");
-        mapLinkBox.setAttribute("type", "text");
-        settingsDiv.appendChild(mapLinkBox);
-
-        settingsDiv.appendChild(document.createElement("BR"));
-        settingsDiv.appendChild(document.createElement("BR"));
-
-        // Create clikable link to start distance measure mode
-        var measureDistanceButton = document.createElement("BUTTON");
-        measureDistanceButton.appendChild(document.createTextNode("Measure distance"));
-        measureDistanceButton.onclick = function(){
-            console.log("measureDistanceButton clicked");
-            if (measureDistanceMode == 0) {
-                startMeasureDistanceFromButton();
-            } else {
-                console.log("measureDistanceButton clicked, already measuring distance");
-            }
-        };
-        settingsDiv.appendChild(measureDistanceButton);
-
-        settingsDiv.appendChild(document.createElement("BR"));
-        settingsDiv.appendChild(document.createElement("BR"));
-
-        // Create check box for KML refresh
-        checkBox = document.createElement("INPUT");
-        checkBox.setAttribute("type", "checkbox");
-        checkBox.value = 'Force KML refresh';
-        checkBox.checked = kmlVersion != null;
-        checkBox.onclick = function() {
-          if (this.checked) {
-            var timesec = Date.now() / 1000;
-            kmlVersion = timesec.toFixed();
-            for (var i = 0; i < layers.length; i++) {
-              if (layers[i].type == 'kml') {
-                if (layers[i].layer) {
-                  layers[i].layer.setMap(null);
-                  layers[i].layer = null;
-                }
                 if (layers[i].visible) {
-                  showLayer(layers[i]);
+                    visible_layers = visible_layers + layers[i].name + ',';
                 }
-              }
             }
-          } else {
-            kmlVersion = null;
-          }
-          console.log("settingsDiv clicked, name=" + this.value + ",checked=", this.checked+",kmlVersion="+kmlVersion);
-
-        };
-        settingsDiv.appendChild(checkBox);
-        settingsDiv.appendChild(document.createTextNode('Force KML refresh'));
-        settingsDiv.appendChild(document.createElement("BR")); 
-
-        // Create check box for Kapsi maastokartat
-        checkBox = document.createElement("INPUT");
-        checkBox.setAttribute("type", "checkbox");
-        checkBox.value = 'Maastokartat from Kapsi';
-        checkBox.checked = use_kapsi_maastokartat;
-        checkBox.onclick = function() {
-          use_kapsi_maastokartat = this.checked;
-          console.log("settingsDiv clicked, name=" + this.value + ",checked=", this.checked);
-        };
-        settingsDiv.appendChild(checkBox);
-        settingsDiv.appendChild(document.createTextNode('Maastokartat from Kapsi'));
-        settingsDiv.appendChild(document.createElement("BR")); 
-
-        // Create check box for Kapsi ortokuvat
-        checkBox = document.createElement("INPUT");
-        checkBox.setAttribute("type", "checkbox");
-        checkBox.value = 'Ortokuvat from Kapsi';
-        checkBox.checked = use_kapsi_ortokuvat;
-        checkBox.onclick = function() {
-          use_kapsi_ortokuvat = this.checked;
-          console.log("settingsDiv clicked, name=" + this.value + ",checked=", this.checked);
-        };
-        settingsDiv.appendChild(checkBox);
-        settingsDiv.appendChild(document.createTextNode('Ortokuvat from Kapsi'));
-        settingsDiv.appendChild(document.createElement("BR")); 
-        settingsDiv.appendChild(document.createElement("BR")); 
-
-        // Select visible maps
-        settingsDiv.appendChild(document.createTextNode('Visible maps'));
-        settingsDiv.appendChild(document.createElement("BR"));
-
-        for (var i = 0; i < maps.length; i++) {
-          checkBox = document.createElement("INPUT");
-          checkBox.setAttribute("type", "checkbox");
-          checkBox.value = maps[i].name;
-          checkBox.checked = maps[i].visible;
-          checkBox.onclick = function() {
-            console.log("settingsDialog clicked, map=" + this.value + ",checked=", this.checked);
+            console.log(visible_layers);
+            sessionStorage.setItem('VisibleLayers', visible_layers);
+            var visible_maps = '';
             for (var i = 0; i < maps.length; i++) {
-              if (maps[i].name == this.value) {
-                maps[i].visible = this.checked;
-              }
+                if (maps[i].visible) {
+                    visible_maps = visible_maps + maps[i].name + ' ';
+                }
             }
-          };
-          settingsDiv.appendChild(checkBox);
-          settingsDiv.appendChild(document.createTextNode(maps[i].name));
-          settingsDiv.appendChild(document.createElement("BR"));            
-        }
-
-        // Select opentopomap a, b or c site
-        settingsDiv.appendChild(document.createElement("BR"));
-        settingsDiv.appendChild(document.createTextNode('OpenTopoMap'));
-        settingsDiv.appendChild(document.createElement("BR"));
-        var opentopomap_a = document.createElement("INPUT");
-        opentopomap_a.setAttribute("type", "radio");
-        opentopomap_a.setAttribute("name", "opentopomap");
-        opentopomap_a.value = 'a';
-        opentopomap_a.checked = opentopomap_site == 'a';
-        opentopomap_a.onclick = function() {
-          opentopomap_site = 'a';
-          console.log("settingsDiv clicked, name=" + this.value + ",checked=", this.checked);
-        };
-        settingsDiv.appendChild(opentopomap_a);
-        settingsDiv.appendChild(document.createTextNode('a'));
-        settingsDiv.appendChild(document.createElement("BR"));
-        var opentopomap_b = document.createElement("INPUT");
-        opentopomap_b.setAttribute("type", "radio");
-        opentopomap_b.setAttribute("name", "opentopomap");
-        opentopomap_b.value = 'b';
-        opentopomap_b.checked = opentopomap_site == 'b';
-        opentopomap_b.onclick = function() {
-          opentopomap_site = 'b';
-          console.log("settingsDiv clicked, name=" + this.value + ",checked=", this.checked);
-        };
-        settingsDiv.appendChild(opentopomap_b);
-        settingsDiv.appendChild(document.createTextNode('b'));
-        settingsDiv.appendChild(document.createElement("BR"));
-        var opentopomap_c = document.createElement("INPUT");
-        opentopomap_c.setAttribute("type", "radio");
-        opentopomap_c.setAttribute("name", "opentopomap");
-        opentopomap_c.value = 'c';
-        opentopomap_c.checked = opentopomap_site == 'c';
-        opentopomap_c.onclick = function() {
-          opentopomap_site = 'c';
-          console.log("settingsDiv clicked, name=" + this.value + ",checked=", this.checked);
-        };
-        settingsDiv.appendChild(opentopomap_c);
-        settingsDiv.appendChild(document.createTextNode('c'));
-        settingsDiv.appendChild(document.createElement("BR"));
-        settingsDiv.appendChild(document.createElement("BR"));
-
-        // extra line break
-        settingsDiv.appendChild(document.createElement("BR"));
-        
-        // Close button
-        var settingsCloseButton = document.createElement("BUTTON");
-        settingsCloseButton.appendChild(document.createTextNode("Close"));
-        settingsCloseButton.onclick = function(){
-          console.log("settingsDiv Close clicked");
-          // check if new center coordinates have been given
-          var new_center = coordinatesBox.value;
-          if (new_center && new_center.length > 3 
-              && new_center != coordinatesBox.defaultValue) 
-          {
-            console.log('new_center='+new_center+',defaultValue='+coordinatesBox.defaultValue);
-            var lat_lng = new_center.split(',');
-            if (lat_lng[0] && lat_lng[1]) {
-              var pos = {
-                lat: Number(lat_lng[0]),
-                lng: Number(lat_lng[1])
-              }
-              map.panTo(pos);
-              autoMove = false;
+            console.log(visible_maps);
+            sessionStorage.setItem('VisibleMaps', visible_maps);
+            if (path.length > 0) {
+                var save_path = '';
+                for (var i = 0; i < path.length; i++) {
+                    var pos = path[i].getCenter();
+                    var posJSON = pos.toJSON();
+                    save_path = save_path + JSON.stringify(posJSON) + ' ';
+                }
+                //alert(save_path);
+                sessionStorage.setItem('Path', save_path);
             }
-          }
-          //setVisibleMaps();
-          infoWindow.close();
-          infoPopup.close();
-        };
-        settingsDiv.appendChild(settingsCloseButton);
-
-        // Help button
-        var settingsHelpButton = document.createElement("BUTTON");
-        settingsHelpButton.style.marginLeft = '11px'
-        settingsHelpButton.appendChild(document.createTextNode("Help"));
-        settingsHelpButton.onclick = function(){
-          console.log("settingsDiv Help clicked");
-          infoWindow.close();
-          infoPopup.close();
-          var contentString = '<div id="content">'+
-            '<div id="siteHelp">'+
-            '</div>'+
-            '<h3 id="helpHeading" class="helpHeading">Url parameters</h3>'+
-            '<div id="bodyContent">'+
-            '<p>' +
-            'kml=url,name[,1]<br> ' +
-            'path=maxdots[,interval sec[,min distance meters]]<br> ' +
-            'center=lat,lng[,label]<br> ' +
-            'marker=lat,lng[,label]<br> ' +
-            'layers=name[,name...]<br> ' +
-            'maps=name[,name...]<br>' + 
-            '</p> ' +
-            '<p>Url can have multiple kml and marker parameters.<br>' +
-            'Possible maps are peruskartta, ortokuvat, opentopomap and mapant.'
-            '</p>' +
-            '</div>'+
-            '</div>';
-          infoPopup.close();
-          infoWindow.setContent(contentString);
-          infoWindow.setPosition(map.getCenter());
-          infoWindow.open(map);
-        };
-        settingsDiv.appendChild(settingsHelpButton);
-
-        // Info button
-        var settingsInfoButton = document.createElement("BUTTON");
-        settingsInfoButton.style.marginLeft = '11px'
-        settingsInfoButton.appendChild(document.createTextNode("Info"));
-        settingsInfoButton.onclick = function(){
-          console.log("settingsDiv Info clicked");
-          infoPopup.close();
-          infoWindow.close();
-          var contentString = '<div id="content">'+
-            '<div id="siteInfo">'+
-            '</div>'+
-            '<h3 id="infoHeading" class="infoHeading">Attribution</h3>'+
-            '<div id="bodyContent">'+
-            '<p>' +
-            'Roadmap and satellite images from Google.' +
-            '</p><p>' +
-            'Topography maps and aerial images from Maanmittauslaitos:<br>' +
-            '<a href=https://www.maanmittauslaitos.fi/>https://www.maanmittauslaitos.fi/</a>' +
-            '</p><p>' +            
-            'Ortoilmakuvat and optionally Maastokartat hosted by:<br>' +            
-            '<a href=https://www.kapsi.fi/>https://www.kapsi.fi/</a>' +
-            '</p><p>' +            
-            'MapAnt maps created and hosted by:<br>' +                       
-            '<a href=https://www.mapant.fi/>https://www.mapant.fi/</a>' +
-            '</p><p>' +            
-            'OpenTopoMap data: © OpenStreetMap contributors, SRTM | map style: © OpenTopoMap (CC-BY-SA)' +
-            '</p><p>' +            
-            'Maps for Parenteesikartat layer are from book:<br>' + 
-            'Pekka Silvast, 1991. Porkkala 1944–1956 - Neuvostoliiton merisotilaallinen tukikohta. Tutkimusraportti, Sotamuseo 1/1991.' +
-            '</p></p> ' +
-            'Lynx layer data created by Kirkkonummi Orienteering Club Lynx:<br>' +
-            '<a href=https://www.lynx.fi/index.php/parenteesi-suunnistuskartalle>Parenteesi suunnistuskartalle</a>' +
-            '</p><p>' +
-            'Muinaisjäännökset and Maailmaperintökohteet data from Museovirasto:<br>' +
-            '<a href=https://www.museovirasto.fi>Museovirasto</a>' +
-            '</p></p> ' +            
-            'Planetskier layer data from:<br>' +
-            '<a href=https://planetskier.blogspot.fi/>Planetskier</a>' +
-            '</p></p> ' +          
-            'Espoon lähiretkiä layer data is from my own trips around Espoo, Finland.<br>' +
-            '</p></p> ' +     
-            'Parenteesipisteet data is from Parenteesikartat layer maps and other sources.<br>' +
-            '</p></p> ' +             
-            'Luolanimistö and Muut mielenkiintoiset nimet from <a href=https://nimisampo.fi/>Nimisampo</a>.<br>' +
-            '</p></p> ' +             
-            'Luolaseuran luolat data is from <a href=https://caving.fi/>Suomen luolaseura</a> and<br>' + 
-            'from book <a href=https://www.salakirjat.net/product/242/suomen-luolat>Suomen luolat</a>.<br>' +
-            '</p></p> ' +
-            'Lintornit from Google My Maps <a href=https://www.google.com/maps/d/u/0/viewer?mid=1V0G10JDy6RxPXmN_eyyFb-5MT0E&ll=65.09362197686224%2C25.329884500000027&z=6>Suomen vesi-, näkö- ja lintutornit</a>'
-            '</p></p> ' +
-            '</div>'+
-            '</div>';
-          infoPopup.close();
-          infoWindow.setContent(contentString);
-          infoWindow.setPosition(map.getCenter());
-          infoWindow.open(map);
-        };
-        settingsDiv.appendChild(settingsInfoButton);
-        
-
-        // ------------------------------------------------------------
-        // initMap: Crosshair to show the map center
-
-        var crosshairShape = {coords:[0,0,0,0],type:'rect'};
-        centerMarker = new google.maps.Marker({
-          map: map,
-          icon: 'https://www.daftlogic.com/images/cross-hairs.gif',
-          shape: crosshairShape
-        });
-        centerMarker.bindTo('position', map, 'center');
-        centerMarker.setVisible(!autoMove);
-
-        // ------------------------------------------------------------
-        // initMap: Peruskartta 
-
-        var perusMapType = new google.maps.ImageMapType({
-          getTileUrl: function(coord, zoom) {
-            if (use_kapsi_maastokartat) {
-                var url =  "https://tiles.kartat.kapsi.fi/peruskartta/" + zoom + "/" + 
-                  coord.x + "/" + coord.y + ".jpg";
-                return url;
-            } else {
-              var url =  "https://avoin-karttakuva.maanmittauslaitos.fi/avoin/wmts/1.0.0/maastokartta/default/WGS84_Pseudo-Mercator/" + zoom + "/" + 
-                  coord.y + "/" + coord.x + ".png?api-key=API_KEY";
-                //console.log('Peruskartta url='+url);
-                return url;
-            }
-          },
-          tileSize: new google.maps.Size(256, 256),
-          maxZoom: 18,
-          minZoom: 0,
-          name: 'Maasto'
-        });
-
-        map.mapTypes.set('peruskartta', perusMapType);
-
-        // ------------------------------------------------------------
-        // initMap: Ortoilmakuvat
-
-        var ortoMapType = new google.maps.ImageMapType({
-          getTileUrl: function(coord, zoom) {
-            if (use_kapsi_ortokuvat) {
-                var url = "https://tiles.kartat.kapsi.fi/ortokuva/" + zoom + "/" + 
-                  coord.x + "/" + coord.y + ".png";
-                //console.log('Ortokuvat url='+url);
-                return url;
-            } else {
-              var url =  "https://avoin-karttakuva.maanmittauslaitos.fi/avoin/wmts/1.0.0/ortokuva/default/WGS84_Pseudo-Mercator/" + zoom + "/" + 
-                  coord.y + "/" + coord.x + ".png?api-key=API_KEY";
-                //console.log('Ortokuvat url='+url);
-                return url;
-            }
-          },
-          tileSize: new google.maps.Size(256, 256),
-          maxZoom: 19,
-          minZoom: 0,
-          name: 'Ilma'
-        });
-
-        map.mapTypes.set('ortokuvat', ortoMapType);
-
-        // ------------------------------------------------------------
-        // initMap: Open Topo Map 
-
-        var opentopoMapType = new google.maps.ImageMapType({
-          getTileUrl: function(coord, zoom) {
-              var url= "https://" + opentopomap_site + ".tile.opentopomap.org/" + zoom + "/" + coord.x + "/" + coord.y + ".png";
-              //console.log('OpenTopoMap url='+url);
-              return url;
-          },
-          tileSize: new google.maps.Size(256, 256),
-          maxZoom: 17,
-          minZoom: 0,
-          name: 'OpenTopo'
-        });
-
-        map.mapTypes.set('opentopomap', opentopoMapType);
-
-        // ------------------------------------------------------------
-        // initMap: MapAnt 
-
-        var mapantMapType = new google.maps.ImageMapType({
-          getTileUrl: function(coord, zoom) {
-              var url = 'https://wmts.mapant.fi/wmts_EPSG3857.php?z='+zoom+'&x='+coord.x+'&y='+coord.y;
-              //console.log('MapAnt url='+url);
-              return url;
-          },
-          tileSize: new google.maps.Size(256, 256),
-          maxZoom: 19,
-          minZoom: 7,
-          name: 'MapAnt'
-        });
-
-        map.mapTypes.set('mapant', mapantMapType);
-
-        // ------------------------------------------------------------
-        // initMap: Init some variables
-
-        marker = null;
-        infoWindow = new google.maps.InfoWindow;
-        infoPopup = new google.maps.InfoWindow;
-        infoBottomWindow = new google.maps.InfoWindow({
-                                disableAutoPan: true,
-                                pixelOffset: new google.maps.Size(0, -50) // Set the y-axis offset to -50 pixels
-                            });
-
-        function setDivStyle(div) {
-          div.style.backgroundColor = '#fff';
-          div.style.border = '2px solid #fff';
-          div.style.borderRadius = '3px';
-          div.style.boxShadow = '0 2px 6px rgba(0,0,0,.3)';
-        }
-
-        // ----------------------------------------------------------
-        // initMap: GPS icon to center the map
-
-        var gpsDiv = document.createElement('div');
-        var gpsButton = document.createElement("IMG");
-        gpsButton.src = 'https://ruuth.xyz/ic_gps_fixed_black_24px.svg';
-        gpsButton.addEventListener('click', function() {
-          map.panTo(current_location);
-          autoMove = true;
-          centerMarker.setVisible(!autoMove);
-          console.log("click Center Map:autoMove=true");
-        });
-        setDivStyle(gpsDiv);
-        gpsDiv.style.marginRight = '11px';
-        gpsDiv.appendChild(gpsButton);
-        map.controls[google.maps.ControlPosition.RIGHT_CENTER].push(gpsDiv);
-
-        // ----------------------------------------------------------
-        // initMap: Buttons for extarnal maps: 
-        //    1956 - Kirkkonummi aerial images from 1956
-        //    MML Laser - Maanmittauslaitos laser scan for surface structures
-
-        var externalMapsDiv = document.createElement('div');
-        var button1956 = document.createElement("BUTTON");
-        var button1956Text = document.createTextNode("1956");
-        button1956.appendChild(button1956Text);
-        button1956.addEventListener('click', function() {
-          // save current state in case we return back
-          saveState();          
-          var map_center = map.getCenter();
-          // convert map coordinates to ETRS-GK25 (EPSG:3879) that is used for aerial photos
-          /*
-          var coord = proj4('ETRS-GK25', [map_center.lng(), map_center.lat()]);
-          var link = "https://kirkkonummi.karttatiimi.fi/?setlanguage=fi&e="+coord[0]+"&n="+coord[1]+"&r=1&w=&l=orto1954&o=100"+
-                     "&geom=POINT("+coord[0]+"%20"+coord[1]+")";
-          */
-          var coord = proj4('ETRS-TM35FIN', [map_center.lng(), map_center.lat()]);
-          var link = "https://kartta.paikkatietoikkuna.fi/?zoomLevel=10&coord="+coord[0]+"_"+coord[1]+"&mapLayers=801+100+default,3400+100+"+
-                 "ortokuva:indeksi&markers=2|1|ffde00|"+coord[0]+"_"+coord[1]+"|&timeseries=1956&noSavedState=true&showIntro=false&lang=fi";
-          console.log("click 1956: jump to page " + link);
-          //alert('jump to 1956');
-          window.location.href = link;
-        });
-        externalMapsDiv.appendChild(button1956);
-
-        var buttonLaser = document.createElement("BUTTON");
-        var buttonLaserText = document.createTextNode("MML Laser");
-        buttonLaser.appendChild(buttonLaserText);
-        buttonLaser.addEventListener('click', function() {
-          // save current state in case we return back
-          saveState();          
-          var map_center = map.getCenter();
-          // convert map coordinates to ETRS-TM35FIN (EPSG:3067) that is used for maanmittauslaitos maps
-          var coord = proj4('ETRS-TM35FIN', [map_center.lng(), map_center.lat()]);
-          var link = "https://asiointi.maanmittauslaitos.fi/karttapaikka/?share=customMarker&"+
-                     "n="+coord[1]+"&e="+coord[0]+
-                     "&desc=&zoom=10&layers=%5B%7B%22id%22%3A186%2C%22opacity%22%3A50%7D%5D";
-          console.log("click Laser: jump to page " + link);
-          //alert('jump to MML');
-          window.location.href = link;
-        }); 
-        externalMapsDiv.appendChild(buttonLaser);
-
-        var buttonGoogleMaps = document.createElement("BUTTON");
-        var buttonGoogleMapsText = document.createTextNode("Google");
-        buttonGoogleMaps.appendChild(buttonGoogleMapsText);
-        buttonGoogleMaps.addEventListener('click', function() {
-          // save current state in case we return back
-          saveState();          
-          var map_center = map.getCenter();
-          var link = "https://www.google.com/maps/place/"+map_center.lat()+","+map_center.lng();
-          console.log("click Google: jump to page " + link);
-          //alert('jump to MML');
-          window.location.href = link;
-        }); 
-        externalMapsDiv.appendChild(buttonGoogleMaps);
-
-        externalMapsDiv.appendChild(document.createElement("BR")); 
-        externalMapsDiv.appendChild(document.createElement("BR"));
-        
-        mapInfoText = document.createTextNode("info");
-        mapInfoTextDiv = document.createElement('div');
-        mapInfoTextDiv.innerHTML = ' ';        
-        mapInfoTextDiv.style.textAlign = "center";
-        externalMapsDiv.appendChild(mapInfoTextDiv);
-        //externalMapsDiv.style.marginBottom = '22px';
-        externalMapsDiv.style.marginBottom = '2px';
-
-        map.controls[google.maps.ControlPosition.BOTTOM_CENTER].push(externalMapsDiv);
-
-        // ----------------------------------------------------------
-        // initMap: dialog for layers
-
-        var layersDiv = document.createElement('div');
-        var layersButton = document.createElement("IMG");
-        layersButton.src = 'https://ruuth.xyz/ic_layers_black_24px.svg';
-        layersButton.addEventListener('click', function() {
-          console.log("click Layer, layerDialogDiv");
-          infoPopup.close();
-          infoWindow.close();
-          infoWindow.setContent(layerDialogDiv);
-          infoWindow.setPosition(map.getCenter());
-          infoWindow.open(map);
-        });
-        setDivStyle(layersDiv);
-        layersDiv.style.marginLeft = '11px';
-        layersDiv.appendChild(layersButton);
-        map.controls[google.maps.ControlPosition.LEFT_CENTER].push(layersDiv);
-
-        // ----------------------------------------------------------
-        // initMap: dialog for settings
-
-        var settingsButtonDiv = document.createElement('div');
-        var settingsButton = document.createElement("IMG");
-        settingsButton.src = 'https://ruuth.xyz/ic_settings_black_24px.svg';
-        settingsButton.addEventListener('click', function() {
-          console.log("click Settings");
-
-          var map_center = map.getCenter();
-          
-          coordinatesBox.value = String(map_center.lat())+','+String(map_center.lng());
-          coordinatesBox.defaultValue = coordinatesBox.value;
-          
-          mapLinkBox.value = "https://ruuth.xyz/map.html?center=" + String(map_center.lat())+','+String(map_center.lng());
-          mapLinkBox.defaultValue = coordinatesBox.value;
-          
-          infoPopup.close();
-          infoWindow.close();
-          infoWindow.setContent(settingsDiv);
-          infoWindow.setPosition(map_center);
-          infoWindow.open(map);
-          
-        });
-        setDivStyle(settingsButtonDiv);
-        settingsButtonDiv.style.marginLeft = '11px';
-        settingsButtonDiv.appendChild(settingsButton);
-        map.controls[google.maps.ControlPosition.LEFT_BOTTOM].push(settingsButtonDiv);
-
-        // ------------------------------------------------------------
-        // initMap: Geolocation error
-
-        function handleLocationError(browserHasGeolocation, infoWindow, pos) {
-          var msg = browserHasGeolocation ?
-                                'Error: The Geolocation service failed.' :
-                                'Error: Your browser doesn\'t support geolocation.';
-          console.log(msg);
-          infoPopup.close();
-          infoWindow.close();
-          infoWindow.setPosition(pos);
-          infoWindow.setContent(msg);
-          infoWindow.open(map);
         }
 
         // ------------------------------------------------------------
-        // initMap: Event listener for map type change (toggle stree view)
+        // restore current state from session storate
 
-        map.addListener('maptypeid_changed', function() {
-          var showStreetViewControl = true;
-          if (map.getMapTypeId() == 'peruskartta') {
-            if (use_kapsi_maastokartat) {
-              mapInfoTextDiv.innerHTML = 'Maanmittauslaitos, Kapsi';
+        function restoreBool(name) {
+            var num = Number(sessionStorage.getItem(name));
+            if (num) {
+                return true;
             } else {
-              mapInfoTextDiv.innerHTML = 'Maanmittauslaitos';
+                return false;
             }
-            showStreetViewControl = false;
-          } else if (map.getMapTypeId() == 'ortokuvat') {
-            if (use_kapsi_ortokuvat) {
-              mapInfoTextDiv.innerHTML = 'Maanmittauslaitos, Kapsi';
+        }
+
+        function restoreState(atStart) {
+            if (sessionStorage.getItem('AutoMove')) {
+                autoMove = restoreBool('AutoMove');
+                if (centerMarker) {
+                    centerMarker.setVisible(!autoMove);
+                }
+                console.log("restoreState:autoMove=" + autoMove);
             } else {
-              mapInfoTextDiv.innerHTML = 'Maanmittauslaitos';
+                console.log("restoreState:could not restore autoMove");
             }
-            showStreetViewControl = false;
-          } else if (map.getMapTypeId() == 'mapant') {
-            mapInfoTextDiv.innerHTML = 'Maanmittauslaitos, MapAnt';
-            showStreetViewControl = false;
-          } else if (map.getMapTypeId() == 'opentopomap') {
-            mapInfoTextDiv.innerHTML = 'OpenStreetMap, OpenTopoMap';
-            showStreetViewControl = false;
-          } else {
-            mapInfoTextDiv.innerHTML = '';
-          }
-          map.setOptions({
-            streetViewControl: showStreetViewControl
-          });
-        });
-
-        // ------------------------------------------------------------
-        // initMap: Event listener for user moving the map manually
-
-        map.addListener('dragstart', function() {
-            if (autoMove) {
-              console.log('dragstart: set autoMove=false');
+            if (sessionStorage.getItem('Lat')
+                && sessionStorage.getItem('Lng')
+                && sessionStorage.getItem('Zoom')
+                && sessionStorage.getItem('MapTypeId')) {
+                var pos = {
+                    lat: Number(sessionStorage.getItem('Lat')),
+                    lng: Number(sessionStorage.getItem('Lng'))
+                };
+                start_location = pos;
+                console.log("restoreState:lat=" + pos.lat + ",lng=" + pos.lng +
+                    ',Zoom=' + sessionStorage.getItem('Zoom') +
+                    ',MapTypeId=' + sessionStorage.getItem('MapTypeId'));
+                start_maptypeid = sessionStorage.getItem('MapTypeId');
+                map_zoom = Number(sessionStorage.getItem('Zoom'));
+                if (map) {
+                    map.setMapTypeId(start_maptypeid);
+                    map.setZoom(map_zoom);
+                    map.panTo(pos);
+                }
+                updateCircleRadius(map_zoom);
+            } else {
+                console.log("restoreState:could not restore lat,lng,Zoom,MapTypeId");
             }
-            autoMove = false;
-            centerMarker.setVisible(!autoMove);
-        });
-
-        // ------------------------------------------------------------
-        // initMap: Event listener for user zooming the map
-        
-        google.maps.event.addListener(map, 'zoom_changed', function () {
-          var old_radius = circle_radius;
-          updateCircleRadius(map.getZoom());
-          if (old_radius != circle_radius) {
-            console.log("zoom_changed, change circle radius");
-            for (var i = 0; i < path.length; i++) {
-              path[i].setRadius(circle_radius);
+            if (sessionStorage.getItem('kmlVersion')) {
+                kmlVersion = sessionStorage.getItem('kmlVersion');
             }
-          }
-        });
+            if (sessionStorage.getItem('VisibleLayers')) {
+                var visible_layers = sessionStorage.getItem('VisibleLayers').split(',');
+                console.log('visible_layers=' + visible_layers);
+                for (var i = 0; i < visible_layers.length; i++) {
+                    for (var j = 0; j < layers.length; j++) {
+                        if (visible_layers[i] == layers[j].name) {
+                            layers[j].visible = true;
+                        }
+                    }
+                }
+            } else {
+                console.log('restoreState:could not restore VisibleLayers');
+            }
+            if (sessionStorage.getItem('VisibleMaps')) {
+                var visible_maps = sessionStorage.getItem('VisibleMaps').split(' ');
+                console.log(visible_maps);
+                mapsSetVisible(visible_maps);
+            } else {
+                console.log('restoreState:could not restore VisibleLayers');
+            }
+            if (!atStart) {
+                if (sessionStorage.getItem('Path')) {
+                    var saved_path = sessionStorage.getItem('Path').split(' ');
+                    console.log(saved_path);
+                    for (var i = 0; i < saved_path.length && saved_path[i].length > 5; i++) {
+                        console.log('saved_path[' + i + ']=' + saved_path[i]);
+                        var json = JSON.parse(saved_path[i]);
+                        path[path.length] = pathCircle({
+                            lat: json['lat'],
+                            lng: json['lng']
+                        });
+                    }
+                } else {
+                    console.log('restoreState:could not restore Path');
+                }
+            }
+        }
 
-        // initMap: Event listener for right click
-        google.maps.event.addListener(map, 'rightclick', function(event) {
-          var pos = event.latLng;
-          lastRightClickPos = pos;
-          infoPopup.close();
-          infoWindow.close();
-          infoWindow.setPosition(pos);
-          if (measureDistanceMode != 0) {
-            // We are in measure distance mode.
-            measureDistanceEvent(pos);
-          } else {
-            var content = '<p>View on Google Maps: <a href=https://www.google.com/maps/place/'+pos.lat+','+pos.lng+' target=_blank>' + pos.lat + ',' + pos.lng +'</a>' +
-                          '<img src="https://ruuth.xyz/ic_open_in_new.svg" style="height:20px"></p>';
-            // add clickable option to infobox to measure distance
-            content += '<p><a href="javascript:startMeasureDistance()" style="color:blue">Measure distance</a></p>';
-            console.log(content);
-            infoWindow.setContent(content);
-            infoWindow.open(map);
-          }
-        });
-
-        google.maps.event.addListener(map, 'click', function(event) {
-          if (measureDistanceMode != 0) {
-            // We are in measure distance mode.
-            console.log("click");
-            var pos = event.latLng;
-            measureDistanceEvent(pos);
-          }
-        });
-
-        google.maps.event.addListener(map, 'touchend', function(event) {
-          if (measureDistanceMode != 0) {
-            // We are in measure distance mode.
-            console.log("touchend");
-            var touch = event.changedTouches[0];
-            var point = new google.maps.Point(touch.clientX, touch.clientY);
-            var pos = overlay.getProjection().fromContainerPixelToLatLng(point);
-            console.log("touchend: " + pos);
-            measureDistanceEvent(pos);
-          }
-        });
-
+        function mapsSetVisible(visible_maps) {
+            console.log("mapsSetVisible, visible_maps=" + visible_maps);
+            for (var j = 0; j < maps.length; j++) {
+                maps[j].visible = false;
+            }
+            for (var i = 0; i < visible_maps.length; i++) {
+                for (var j = 0; j < maps.length; j++) {
+                    let set_visible = false;
+                    if (visible_maps[i] == maps[j].name) {
+                        set_visible = true;
+                    } else {
+                        for (let k = 0; k < maps[j].altnames.length; k++) {
+                            if (visible_maps[i] == maps[j].altnames[k]) {
+                                set_visible = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (set_visible) {
+                        console.log("set map " + maps[j].name + " visible");
+                        maps[j].visible = true;
+                    }
+                }
+            }
+        }
 
         // ------------------------------------------------------------
-        // Options for getting position
+        // load layer
 
-        options = {
-          enableHighAccuracy: true,
-          timeout: Infinity,
-          maximumAge: 10000
-        };
+        function loadLayer(layer) {
+            if (!layer.layer) {
+
+                if (layer.type == 'kml') {
+                    console.log("loadLayer:create new kml layer, layer=", layer.name);
+                    var layerUrl = layer.url;
+                    if (kmlVersion) {
+                        layerUrl += '?ver=' + kmlVersion;
+                        console.log("loadLayer:layer url with version=", layerUrl);
+                    }
+                    try {
+                        layer.layer = new google.maps.KmlLayer(layerUrl, {
+                            preserveViewport: true,
+                            suppressInfoWindows: false,
+                            map: map
+                        });
+                    } catch (error) {
+                        console.log(error.message);
+                    }
+
+                } else if (layer.type == 'oldmaps') {
+                    console.log("loadLayer:create new oldmaps layer, layer=", layer.name);
+                    layer.layer = [];
+                    for (var i = 0; i < overlayMaps.length; i++) {
+                        var newOverlay = new google.maps.GroundOverlay(
+                            overlayMaps[i].url,
+                            overlayMaps[i].bounds);
+                        layer.layer[layer.layer.length] = newOverlay;
+                    }
+
+                } else if (layer.type == 'tiled_geojson') {
+                    console.log("loadLayer:tiled_geojson, nothing to do");
+
+                } else if (layer.type == 'activityjson') {
+                    console.log("loadLayer:ActivityJSON, layer", layer.name);
+                    loadActivityJSON(layer);
+                    return false;
+
+                } else if (layer.type == 'kmlarray') {
+                    console.log("loadLayer:create new kml array layer, layer=", layer.name);
+                    layer.layer = [];
+                    for (var i = 0; i < layer.url.length; i++)
+                        layer.layer[i] = new google.maps.KmlLayer(layer.url[i], {
+                            preserveViewport: true,
+                            suppressInfoWindows: false
+                        });
+                } else {
+                    console.log("loadLayer:error, unknown layer, layer=", layer.name);
+                }
+            } else {
+                console.log("loadLayer:layer already loaded, layer=", layer.name);
+            }
+            return true;
+        }
 
         // ------------------------------------------------------------
-        // Try HTML5 geolocation.
+        // ActivityJSON layer load/show/hide
 
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                updatePosition, 
-                function() {
-                    handleLocationError(true, infoWindow, map.getCenter());
+        function addRowActivityJSON(name, value, is_url) {
+            if (value == null || value == undefined) {
+                return '';
+            }
+            if (is_url) {
+                return "<tr><td>" + name + "</td><td><a href=" + value + ">Kartta</a></td></tr>";
+            } else {
+                return "<tr><td>" + name + "</td><td>" + value + "</td></tr>";
+            }
+        }
+
+        function loadActivityJSON(layer) {
+            console.log('loadActivityJSON:start fetch');
+            fetch(layer.url)
+                .then(response => response.json())
+                .then(json => {
+                    console.log('loadActivityJSON:process json');
+                    js = json.features;
+                    //console.log('loadActivityJSON:js', js);
+                    console.log('loadActivityJSON:js len', js.length);
+                    var markers = [];
+                    for (var i = 0; i < js.length; i++) {
+                        var infotxt = "<table>" +
+                            addRowActivityJSON("Nimi", js[i].properties.n, false) +
+                            addRowActivityJSON("Pituus", js[i].properties.l, false) +
+                            addRowActivityJSON("Kirjaaja", js[i].properties.rl[0].w, false) +
+                            addRowActivityJSON("Kartta", js[i].properties.m, true) +
+                            "</table>" +
+                            "<br><a href=" + js[i].properties.rl[0].u + ">Lisätietoja</a>";
+                        const marker = new google.maps.Marker({
+                            position: { lat: js[i].geometry.coordinates[0], lng: js[i].geometry.coordinates[1] },
+                            map: map,
+                            title: js[i].properties.n,
+                            info: infotxt,
+                            icon: {
+                                url: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png"
+                            }
+                        });
+                        marker.addListener("click", () => {
+                            infoWindow.setContent(marker.info);
+                            infoWindow.open(map, marker);
+                        });
+                        markers.push(marker);
+                    }
+                    console.log('loadActivityJSON:layer elements', markers.length);
+                    layer.layer = markers;
+                })
+                .catch(err => console.error(err))
+        }
+
+        function showActivityJSON(layer) {
+            if (layers == null) {
+                console.log('showActivityJSON:null layer');
+            } else {
+                console.log('showActivityJSON:layer elements', layer.length);
+                for (var i = 0; i < layer.length; i++) {
+                    layer[i].setMap(map);
+                }
+            }
+        }
+
+        function hideActivityJSON(layer) {
+            for (var i = 0; i < layer.length; i++) {
+                layer[i].setMap(null);
+            }
+        }
+
+        // ------------------------------------------------------------
+        // Tiled Geojson layer show/hide
+
+        var tiled_geojson_tilenames = [];
+        var tiled_geojson_visible = false;
+        var tiled_geojson_listener = null;
+        var tiled_geojson_bounds_changed = false;
+        var tiled_geojson_zoom = 12;
+
+        function fix_order(arr2) {
+            if (arr2[0] > arr2[1]) {
+                return [arr2[1], arr2[0]];
+            } else {
+                return arr2;
+            }
+        }
+
+        function cleanupProperty(prop) {
+            if (prop != undefined) {
+                prop = prop.toString().trim();
+                if (prop.charAt(prop.length - 1) == ",") {
+                    prop = prop.slice(0, -1)
+                }
+            }
+            return prop;
+        }
+
+        function getTiledGeojsonHtml(feat, name) {
+            var prop = cleanupProperty(feat.getProperty(name));
+            if (prop == undefined) {
+                return "";
+            }
+            if (name == "Mjtunnus") {
+                name = "More info";
+                prop = "<a href=https://www.kyppi.fi/palveluikkuna/mjreki/read/asp/r_kohde_det.aspx?KOHDE_ID=" + prop + ">Museovirasto</a>"
+            }
+            return "<tr><td>" + name + "</td><td>" + prop + "</td></tr>";
+        }
+
+        // Tile functions from:
+        // https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames
+        function long2tile(lon, zoom) { return (Math.floor((lon + 180) / 360 * Math.pow(2, zoom))); }
+        function lat2tile(lat, zoom) { return (Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, zoom))); }
+
+        function showTiledGeojsonLayer() {
+
+            tiled_geojson_visible = true;
+
+            if (!tiled_geojson_bounds_changed) {
+                console.log("showTiledGeojsonLayer:!tiled_geojson_bounds_changed");
+                return;
+            }
+
+            // calculate tiles
+            console.log("showTiledGeojsonLayer:calculate tiles");
+            if (typeof map.getBounds !== 'function') {
+                console.log("showTiledGeojsonLayer:map.getBounds not available");
+                return;
+            }
+            var bounds = map.getBounds();
+            //console.log("showTiledGeojsonLayer:bounds", bounds.getNorthEast().lat(), bounds.getNorthEast().lng(), bounds.getSouthWest().lat(), bounds.getSouthWest().lng());
+            //console.log("showTiledGeojsonLayer:current_location", current_location, long2tile(current_location.lng, tiled_geojson_zoom), lat2tile(current_location.lat, tiled_geojson_zoom));
+            var bounds_x = [
+                long2tile(bounds.getNorthEast().lng(), tiled_geojson_zoom),
+                long2tile(bounds.getSouthWest().lng(), tiled_geojson_zoom)
+            ];
+            var bounds_y = [
+                lat2tile(bounds.getNorthEast().lat(), tiled_geojson_zoom),
+                lat2tile(bounds.getSouthWest().lat(), tiled_geojson_zoom)
+            ];
+            bounds_x = fix_order(bounds_x);
+            bounds_y = fix_order(bounds_y);
+            bounds_x[1] = bounds_x[1] + 1;
+            bounds_y[1] = bounds_y[1] + 1;
+            console.log("showTiledGeojsonLayer:bounds_x", bounds_x, "bounds_y", bounds_y);
+            var new_tiles = [];
+            var new_tile_xy = [];
+            for (var x = bounds_x[0]; x < bounds_x[1]; x++) {
+                for (var y = bounds_y[0]; y < bounds_y[1]; y++) {
+                    //console.log("showTiledGeojsonLayer:x", x, "y", y);
+                    new_tiles[new_tiles.length] = x.toString() + '_' + y.toString();
+                    new_tile_xy[new_tile_xy.length] = [x, y];
+                    //console.log("showTiledGeojsonLayer:tile", new_tiles[new_tiles.length-1]);
+                }
+            }
+            console.log("showTiledGeojsonLayer:new_tiles", new_tiles);
+
+            // find tiles that need to be loaded and tiles
+            // that can be removed
+            //console.log("showTiledGeojsonLayer:show new tiles", new_tiles.length);
+            for (var i = 0; i < new_tiles.length; i++) {
+                var found_tile = false;
+                for (var j = 0; j < tiled_geojson_tilenames.length; j++) {
+                    if (tiled_geojson_tilenames[j] == new_tiles[i]) {
+                        // tile is already visible, set it to null
+                        // so we do not remove it
+                        console.log("showTiledGeojsonLayer:visible tile", new_tiles[i]);
+                        tiled_geojson_tilenames[j] = '';
+                        found_tile = true;
+                        break;
+                    }
+                }
+                if (!found_tile) {
+                    console.log("showTiledGeojsonLayer:load tile " + new_tiles[i]);
+                    var xy = new_tile_xy[i];
+                    var url = 'https://ruuth.xyz/tiles/' + xy[0].toString() + '/tile_' + xy[1].toString() + '.geojson';
+                    console.log("showTiledGeojsonLayer:load tile " + new_tiles[i] + " url " + url);
+                    map.data.loadGeoJson(url);
+                }
+            }
+            console.log("showTiledGeojsonLayer:old tiled_geojson_tilenames", tiled_geojson_tilenames);
+
+            // remove those tiles that are not part of current view
+            console.log("showTiledGeojsonLayer:remove out-of-area tiles", tiled_geojson_tilenames.length);
+            for (var j = 0; j < tiled_geojson_tilenames.length; j++) {
+                if (tiled_geojson_tilenames[j] != '') {
+                    //console.log("showTiledGeojsonLayer:check for remove tile " + tiled_geojson_tilenames[j]);
+                    map.data.forEach(function (feature) {
+                        tilename = feature.getProperty('tile');
+                        //console.log("showTiledGeojsonLayer:feature tile " + tilename);
+                        if (tilename == tiled_geojson_tilenames[j]) {
+                            //console.log("showTiledGeojsonLayer:remove tile " + tilename);
+                            map.data.remove(feature);
+                        }
+                    });
+                }
+            }
+            tiled_geojson_tilenames = new_tiles;
+            if (tiled_geojson_listener == null) {
+                tiled_geojson_listener = map.data.addListener('click', function (event) {
+                    var feat = event.feature;
+                    var html = "<table>" +
+                        getTiledGeojsonHtml(feat, "Kohdenimi") +
+                        getTiledGeojsonHtml(feat, "Ajoitus") +
+                        getTiledGeojsonHtml(feat, "Tyyppi") +
+                        getTiledGeojsonHtml(feat, "Alatyyppi") +
+                        getTiledGeojsonHtml(feat, "Laji") +
+                        getTiledGeojsonHtml(feat, "Tuhoutunut") +
+                        getTiledGeojsonHtml(feat, "Luontipvm") +
+                        getTiledGeojsonHtml(feat, "Muutospvm") +
+                        getTiledGeojsonHtml(feat, "Vedenalain") +
+                        getTiledGeojsonHtml(feat, "Mjtunnus") +
+                        "</table>";
+                    infoPopup.close();
+                    infoWindow.close();
+                    infoWindow.setContent(html);
+                    infoWindow.setPosition(event.latLng);
+                    infoWindow.setOptions({ pixelOffset: new google.maps.Size(0, -34) });
+                    infoWindow.open(map);
+                });
+                // Set mouseover event for each feature.
+                map.data.addListener('mouseover', function (event) {
+                    var infostr = cleanupProperty(event.feature.getProperty('Tyyppi'));
+                    if (infostr == undefined) {
+                        infostr = cleanupProperty(event.feature.getProperty('Kohdenimi'));
+                    } else {
+                        var alatyyppi = cleanupProperty(event.feature.getProperty('Alatyyppi'));
+                        if (alatyyppi != undefined) {
+                            infostr = infostr + ', ' + alatyyppi;
+                        }
+                    }
+                    if (infostr == undefined) {
+                        infostr = "No info";
+                    }
+                    infoPopup.close();
+                    infoPopup.setContent(infostr);
+                    infoPopup.setPosition(event.latLng);
+                    infoPopup.setOptions({ pixelOffset: new google.maps.Size(0, -34) });
+                    infoPopup.open(map);
+                });
+            }
+            map.data.addListener('mouseout', function (event) {
+                infoPopup.close();
             });
-            id = navigator.geolocation.watchPosition(updatePosition, watchError, options);
-        } else {
-          // Browser doesn't support Geolocation
-          handleLocationError(false, infoWindow, map.getCenter());
+            console.log("showTiledGeojsonLayer:done");
         }
-      } // initMap: end
 
-      // Calculate distance between points that the user clicks on the map
-      function calcDistance(p1, p2) {
-        return google.maps.geometry.spherical.computeDistanceBetween(p1, p2);
-      }
-
-      // Add a line to the map between clicked points
-      function addLineToMeasureDistancePath(p1, p2) {
-        var line = new google.maps.Polyline({
-          path: [p1, p2],
-          strokeColor: "#FF0000",
-          strokeWeight: 4,
-          map: map
-        });
-        measureDistancePath.push(line);
-        // Add circle at the end of the line
-        measureDistancePath.push(distancePathCircle(p2));
-      }
-
-      function measureDistanceEvent(pos) {
-          console.log("measureDistanceEvent");
-          if (measureDistanceMode == 1) {
-              measureDistanceMode = 2;
-              startMeasureDistanceFromPos(pos);
-          } else {
-              addLineToMeasureDistancePath(measureDistanceLastPos, pos);
-              measureDistanceLength += calcDistance(measureDistanceLastPos, pos);
-              measureDistanceLastPos = pos;
-              showMeasureDistance();
-          }
-      }
-
-      // Clear lines from the map
-      function clearMeasureDistancePath() {
-        for (var i = 0; i < measureDistancePath.length; i++) {
-            measureDistancePath[i].setMap(null);
+        function hideTiledGeojsonLayer() {
+            console.log("hideTiledGeojsonLayer");
+            map.data.forEach(function (feature) {
+                map.data.remove(feature);
+            });
+            tiled_geojson_tilenames = [];
+            tiled_geojson_visible = false;
         }
-        measureDistancePath = [];
-      }
 
-      function startMeasureDistanceFromPos(pos)
-      {
-          console.log("startMeasureDistanceFromPos");
-          measureDistancePath = [];
-          measureDistanceLastPos = pos;
-          showMeasureDistance();
-      }
+        function updateTiledGeojsonLayer() {
+            console.log("updateTiledGeojsonLayer");
+            tiled_geojson_bounds_changed = true;
+            if (!tiled_geojson_visible) {
+                console.log("updateTiledGeojsonLayer:not visible");
+                return;
+            }
+            console.log('map.getZoom()', map.getZoom(), 'tiled_geojson_zoom', tiled_geojson_zoom);
+            if (map.getZoom() >= 10) {
+                showTiledGeojsonLayer();
+            } else {
+                // if we zoom out too much do not show 
+                // tiled_geojson points
+                //hideTiledGeojsonLayer();
+                tiled_geojson_visible = true;
+            }
+        }
 
-      // Start from right click menu, we already have a starting position
-      function startMeasureDistance()
-      {
-          console.log("startMeasureDistance");
-          measureDistanceMode = 2;
-          startMeasureDistanceFromPos(lastRightClickPos);
-      }
+        // ------------------------------------------------------------
+        // Handle layer show/hide
 
-      // Start from tools menu button, get the starting position
-      function startMeasureDistanceFromButton()
-      {
-          console.log("startMeasureDistanceFromButton");
-          measureDistanceMode = 1;
-          measureDistancePath = [];
-          showMeasureDistance();
-      }
+        function showLayer(layer) {
+            console.log("showLayer:layer=", layer.name);
+            var complete = loadLayer(layer);
+            if (map && complete) {
+                if (layer.type == 'oldmaps') {
+                    for (var i = 0; i < layer.layer.length; i++) {
+                        layer.layer[i].setMap(map);
+                    }
+                } else if (layer.type == 'kml') {
+                    layer.layer.setMap(map);
+                } else if (layer.type == 'activityjson') {
+                    showActivityJSON(layer.layer);
+                } else if (layer.type == 'kmlarray') {
+                    for (var i = 0; i < layer.layer.length; i++) {
+                        layer.layer[i].setMap(map);
+                    }
+                } else if (layer.type == 'tiled_geojson') {
+                    showTiledGeojsonLayer();
+                }
+            }
+        }
 
-      function stopMeasureDistance()
-      {
-          console.log("stopMeasureDistance");
-          clearMeasureDistancePath();
-          infoBottomWindow.close();
-          measureDistancePath = null;
-          measureDistanceLength = 0;
-          measureDistanceMode = 0;
-      }
+        function hideLayer(layer) {
+            console.log("hideLayer:layer=", layer.name);
+            if (map) {
+                if (layer.type == 'oldmaps') {
+                    for (var i = 0; i < layer.layer.length; i++) {
+                        layer.layer[i].setMap(null);
+                    }
+                } else if (layer.type == 'activityjson') {
+                    hideActivityJSON(layer.layer);
+                } else if (layer.type == 'kml') {
+                    layer.layer.setMap(null);
+                } else if (layer.type == 'kmlarray') {
+                    for (var i = 0; i < layer.layer.length; i++) {
+                        layer.layer[i].setMap(null);
+                    }
+                } else if (layer.type == 'tiled_geojson') {
+                    hideTiledGeojsonLayer();
+                }
+            }
+        }
 
-      function showMeasureDistance()
-      {
-          if (measureDistanceMode == 1) {
-              infoWindow.close();
-              var content = "<p>Click or tap the map to set the starting point</p>";
-          } else if (measureDistanceLength == 0) {
-              infoWindow.close();
-              measureDistancePath.push(distancePathCircle(measureDistanceLastPos));
-              var content = "<p>Click or tap on the map to add points to the path</p>";
-          } else if (measureDistanceLength >= 10000) {
-              var content = "<p>Distance: " + (measureDistanceLength/1000).toFixed(2) + " km</p>";
-          } else {
-              var content = "<p>Distance: " + measureDistanceLength.toFixed(2) + " m</p>";
-          }
-          content += '<p><a href="javascript:stopMeasureDistance()" style="color:blue">Stop measuring</a></p>';
+        function showVisibleLayers() {
+            for (var i = 0; i < layers.length; i++) {
+                if (layers[i].visible) {
+                    showLayer(layers[i]);
+                }
+            }
+        }
 
-          infoBottomWindow.setContent(content);
-          infoBottomWindow.setPosition(infoBottomWindowPos);
-          infoBottomWindow.open(map);
-      }
+        function handleLayer(layer, show) {
+            if (show == layer.visible) {
+                // no change
+                console.log("handleLayer:no change, layer=", layer.name);
+                return;
+            }
+            layer.visible = show;
+            if (show) {
+                showLayer(layer);
+            } else {
+                hideLayer(layer);
+            }
+        }
 
-      // ------------------------------------------------------------
-      // Update current position in the map
+        // ------------------------------------------------------------
+        // Calculate circle radious based on map zoom
 
-      function updatePosition(position) {  
+        function updateCircleRadius(zoom) {
+            if (zoom >= 17) {
+                circle_radius = 20 - zoom;
+                if (circle_radius < 0.5) {
+                    circle_radius = 0.5;
+                }
+            } else {
+                circle_radius = 5;
+            }
+            console.log('updateCircleRadius:zoom=' + zoom + ',circle_radius=' + circle_radius);
+        }
+
+        // ------------------------------------------------------------
+        // Init map
+
+        function initMap() {
+            var checkBox;
+
+            if (!start_maptypeid) {
+                start_maptypeid = google.maps.MapTypeId.ROADMAP;
+            }
+
+            // initMap: proj4 settings
+
+            // ETRS-TM35FIN (EPSG:3067)
+            proj4.defs("ETRS-TM35FIN", "+proj=utm +zone=35 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs");
+            // ETRS-GK25 (EPSG:3879)
+            proj4.defs("ETRS-GK25", "+proj=tmerc +lat_0=0 +lon_0=25 +k=1 +x_0=25500000 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs");
+
+            // initMap: create map
+
+            map = new google.maps.Map(document.getElementById('map'), {
+                center: start_location,
+                zoom: map_zoom,
+                mapTypeId: start_maptypeid,
+                mapTypeControlOptions: {
+                    mapTypeIds: [
+                        google.maps.MapTypeId.ROADMAP,
+                        google.maps.MapTypeId.SATELLITE,
+                        google.maps.MapTypeId.HYBRID
+                    ]
+                }
+            });
+
+            // Geojson marker style
+            map.data.setStyle(function (feature) {
+                return ({
+                    icon: {
+                        url: "https://maps.google.com/mapfiles/ms/icons/green-dot.png"
+                    }
+                });
+            });
+
+            nbasemaps = map.mapTypeControlOptions.mapTypeIds.length;
+            setVisibleMaps();
+
+            function setVisibleMaps() {
+                var n = nbasemaps;
+                var current_nmaps = map.mapTypeControlOptions.mapTypeIds.length;
+                for (var i = 0; i < maps.length; i++) {
+                    if (maps[i].visible) {
+                        map.mapTypeControlOptions.mapTypeIds[n] = maps[i].name;
+                        n++;
+                    }
+                }
+                // clear old names
+                for (var i = n; i < current_nmaps; i++) {
+                    map.mapTypeControlOptions.mapTypeIds[i] = null;
+                }
+            }
+
+            map.addListener('bounds_changed', function () {
+                var bounds = map.getBounds();
+                var northEast = bounds.getNorthEast();
+                var southWest = bounds.getSouthWest();
+                infoBottomWindowPos = new google.maps.LatLng(southWest.lat(), southWest.lng() + (northEast.lng() - southWest.lng()) / 2);
+                if (measureDistanceMode != 0) {
+                    infoBottomWindow.setPosition(infoBottomWindowPos);
+                    infoBottomWindow.open(map);
+                }
+
+                updateTiledGeojsonLayer();
+            });
+
+            // initMap: show markers listed in url
+
+            for (var i = 0; i < url_markers.length; i++) {
+                console.log('show markes, pos=' + url_markers[i].pos + ',label=' + url_markers[i].label);
+                var marker = new google.maps.Marker({
+                    position: url_markers[i].pos,
+                    map: map,
+                    title: 'Url marker',
+                    label: url_markers[i].label,
+                    icon: {
+                        url: "https://maps.google.com/mapfiles/ms/icons/yellow-dot.png"
+                    }
+                });
+            }
+
+            // ------------------------------------------------------------
+            // initMap: Dialog  menu to chose layers, with dialog menu multiple
+            // layers can be visible at the same time
+
+            layerDialogDiv = document.createElement("div");
+
+            // Create check box for all layers
+            for (var i = 0; i < layers.length; i++) {
+                checkBox = document.createElement("INPUT");
+                checkBox.setAttribute("type", "checkbox");
+                checkBox.value = layers[i].name;
+                checkBox.checked = layers[i].visible;
+                checkBox.onclick = function () {
+                    console.log("layerDialog clicked, name=" + this.value + ",checked=", this.checked);
+                    for (var i = 0; i < layers.length; i++) {
+                        if (layers[i].name == this.value) {
+                            handleLayer(layers[i], this.checked);
+                        }
+                    }
+                };
+                layerDialogDiv.appendChild(checkBox);
+                layerDialogDiv.appendChild(document.createTextNode(layers[i].name));
+                layerDialogDiv.appendChild(document.createElement("BR"));
+            }
+
+            // Close button
+            var layerCloseButton = document.createElement("BUTTON");
+            layerCloseButton.appendChild(document.createTextNode("Close"));
+            layerCloseButton.onclick = function () {
+                console.log("layerDialog Close clicked");
+                infoWindow.close();
+                infoPopup.close();
+            };
+            layerDialogDiv.appendChild(layerCloseButton);
+
+            // ------------------------------------------------------------
+            // initMap: Settings dialog  menu
+
+            settingsDiv = document.createElement("div");
+            //document.body.appendChild(settingsDiv);
+
+            settingsDiv.appendChild(document.createTextNode('Version ' + version));
+            settingsDiv.appendChild(document.createElement("BR"));
+
+            settingsDiv.appendChild(document.createElement("BR"));
+            settingsDiv.appendChild(document.createTextNode('Center coordinates:'));
+            settingsDiv.appendChild(document.createElement("BR"));
+            coordinatesBox = document.createElement("INPUT");
+            coordinatesBox.setAttribute("type", "text");
+            settingsDiv.appendChild(coordinatesBox);
+            settingsDiv.appendChild(document.createElement("BR"));
+
+            settingsDiv.appendChild(document.createTextNode('Map link to center coordinates:'));
+            settingsDiv.appendChild(document.createElement("BR"));
+            mapLinkBox = document.createElement("INPUT");
+            mapLinkBox.setAttribute("type", "text");
+            settingsDiv.appendChild(mapLinkBox);
+
+            settingsDiv.appendChild(document.createElement("BR"));
+            settingsDiv.appendChild(document.createElement("BR"));
+
+            // Create clikable link to start distance measure mode
+            var measureDistanceButton = document.createElement("BUTTON");
+            measureDistanceButton.appendChild(document.createTextNode("Measure distance"));
+            measureDistanceButton.onclick = function () {
+                console.log("measureDistanceButton clicked");
+                if (measureDistanceMode == 0) {
+                    startMeasureDistanceFromButton();
+                } else {
+                    console.log("measureDistanceButton clicked, already measuring distance");
+                }
+            };
+            settingsDiv.appendChild(measureDistanceButton);
+
+            settingsDiv.appendChild(document.createElement("BR"));
+            settingsDiv.appendChild(document.createElement("BR"));
+
+            // Create check box for KML refresh
+            checkBox = document.createElement("INPUT");
+            checkBox.setAttribute("type", "checkbox");
+            checkBox.value = 'Force KML refresh';
+            checkBox.checked = kmlVersion != null;
+            checkBox.onclick = function () {
+                if (this.checked) {
+                    var timesec = Date.now() / 1000;
+                    kmlVersion = timesec.toFixed();
+                    for (var i = 0; i < layers.length; i++) {
+                        if (layers[i].type == 'kml') {
+                            if (layers[i].layer) {
+                                layers[i].layer.setMap(null);
+                                layers[i].layer = null;
+                            }
+                            if (layers[i].visible) {
+                                showLayer(layers[i]);
+                            }
+                        }
+                    }
+                } else {
+                    kmlVersion = null;
+                }
+                console.log("settingsDiv clicked, name=" + this.value + ",checked=", this.checked + ",kmlVersion=" + kmlVersion);
+
+            };
+            settingsDiv.appendChild(checkBox);
+            settingsDiv.appendChild(document.createTextNode('Force KML refresh'));
+            settingsDiv.appendChild(document.createElement("BR"));
+
+            // Create check box for Kapsi maastokartat
+            checkBox = document.createElement("INPUT");
+            checkBox.setAttribute("type", "checkbox");
+            checkBox.value = 'Maastokartat from Kapsi';
+            checkBox.checked = use_kapsi_maastokartat;
+            checkBox.onclick = function () {
+                use_kapsi_maastokartat = this.checked;
+                console.log("settingsDiv clicked, name=" + this.value + ",checked=", this.checked);
+            };
+            settingsDiv.appendChild(checkBox);
+            settingsDiv.appendChild(document.createTextNode('Maastokartat from Kapsi'));
+            settingsDiv.appendChild(document.createElement("BR"));
+
+            // Create check box for Kapsi ortokuvat
+            checkBox = document.createElement("INPUT");
+            checkBox.setAttribute("type", "checkbox");
+            checkBox.value = 'Ortokuvat from Kapsi';
+            checkBox.checked = use_kapsi_ortokuvat;
+            checkBox.onclick = function () {
+                use_kapsi_ortokuvat = this.checked;
+                console.log("settingsDiv clicked, name=" + this.value + ",checked=", this.checked);
+            };
+            settingsDiv.appendChild(checkBox);
+            settingsDiv.appendChild(document.createTextNode('Ortokuvat from Kapsi'));
+            settingsDiv.appendChild(document.createElement("BR"));
+            settingsDiv.appendChild(document.createElement("BR"));
+
+            // Select visible maps
+            settingsDiv.appendChild(document.createTextNode('Visible maps'));
+            settingsDiv.appendChild(document.createElement("BR"));
+
+            for (var i = 0; i < maps.length; i++) {
+                checkBox = document.createElement("INPUT");
+                checkBox.setAttribute("type", "checkbox");
+                checkBox.value = maps[i].name;
+                checkBox.checked = maps[i].visible;
+                checkBox.onclick = function () {
+                    console.log("settingsDialog clicked, map=" + this.value + ",checked=", this.checked);
+                    for (var i = 0; i < maps.length; i++) {
+                        if (maps[i].name == this.value) {
+                            maps[i].visible = this.checked;
+                        }
+                    }
+                };
+                settingsDiv.appendChild(checkBox);
+                settingsDiv.appendChild(document.createTextNode(maps[i].name));
+                settingsDiv.appendChild(document.createElement("BR"));
+            }
+
+            // Select opentopomap a, b or c site
+            settingsDiv.appendChild(document.createElement("BR"));
+            settingsDiv.appendChild(document.createTextNode('OpenTopoMap'));
+            settingsDiv.appendChild(document.createElement("BR"));
+            var opentopomap_a = document.createElement("INPUT");
+            opentopomap_a.setAttribute("type", "radio");
+            opentopomap_a.setAttribute("name", "opentopomap");
+            opentopomap_a.value = 'a';
+            opentopomap_a.checked = opentopomap_site == 'a';
+            opentopomap_a.onclick = function () {
+                opentopomap_site = 'a';
+                console.log("settingsDiv clicked, name=" + this.value + ",checked=", this.checked);
+            };
+            settingsDiv.appendChild(opentopomap_a);
+            settingsDiv.appendChild(document.createTextNode('a'));
+            settingsDiv.appendChild(document.createElement("BR"));
+            var opentopomap_b = document.createElement("INPUT");
+            opentopomap_b.setAttribute("type", "radio");
+            opentopomap_b.setAttribute("name", "opentopomap");
+            opentopomap_b.value = 'b';
+            opentopomap_b.checked = opentopomap_site == 'b';
+            opentopomap_b.onclick = function () {
+                opentopomap_site = 'b';
+                console.log("settingsDiv clicked, name=" + this.value + ",checked=", this.checked);
+            };
+            settingsDiv.appendChild(opentopomap_b);
+            settingsDiv.appendChild(document.createTextNode('b'));
+            settingsDiv.appendChild(document.createElement("BR"));
+            var opentopomap_c = document.createElement("INPUT");
+            opentopomap_c.setAttribute("type", "radio");
+            opentopomap_c.setAttribute("name", "opentopomap");
+            opentopomap_c.value = 'c';
+            opentopomap_c.checked = opentopomap_site == 'c';
+            opentopomap_c.onclick = function () {
+                opentopomap_site = 'c';
+                console.log("settingsDiv clicked, name=" + this.value + ",checked=", this.checked);
+            };
+            settingsDiv.appendChild(opentopomap_c);
+            settingsDiv.appendChild(document.createTextNode('c'));
+            settingsDiv.appendChild(document.createElement("BR"));
+            settingsDiv.appendChild(document.createElement("BR"));
+
+            // extra line break
+            settingsDiv.appendChild(document.createElement("BR"));
+
+            // Close button
+            var settingsCloseButton = document.createElement("BUTTON");
+            settingsCloseButton.appendChild(document.createTextNode("Close"));
+            settingsCloseButton.onclick = function () {
+                console.log("settingsDiv Close clicked");
+                // check if new center coordinates have been given
+                var new_center = coordinatesBox.value;
+                if (new_center && new_center.length > 3
+                    && new_center != coordinatesBox.defaultValue) {
+                    console.log('new_center=' + new_center + ',defaultValue=' + coordinatesBox.defaultValue);
+                    var lat_lng = new_center.split(',');
+                    if (lat_lng[0] && lat_lng[1]) {
+                        var pos = {
+                            lat: Number(lat_lng[0]),
+                            lng: Number(lat_lng[1])
+                        }
+                        map.panTo(pos);
+                        autoMove = false;
+                    }
+                }
+                //setVisibleMaps();
+                infoWindow.close();
+                infoPopup.close();
+            };
+            settingsDiv.appendChild(settingsCloseButton);
+
+            // Help button
+            var settingsHelpButton = document.createElement("BUTTON");
+            settingsHelpButton.style.marginLeft = '11px'
+            settingsHelpButton.appendChild(document.createTextNode("Help"));
+            settingsHelpButton.onclick = function () {
+                console.log("settingsDiv Help clicked");
+                infoWindow.close();
+                infoPopup.close();
+                var contentString = '<div id="content">' +
+                    '<div id="siteHelp">' +
+                    '</div>' +
+                    '<h3 id="helpHeading" class="helpHeading">Url parameters</h3>' +
+                    '<div id="bodyContent">' +
+                    '<p>' +
+                    'kml=url,name[,1]<br> ' +
+                    'path=maxdots[,interval sec[,min distance meters]]<br> ' +
+                    'center=lat,lng[,label]<br> ' +
+                    'marker=lat,lng[,label]<br> ' +
+                    'layers=name[,name...]<br> ' +
+                    'maps=name[,name...]<br>' +
+                    '</p> ' +
+                    '<p>Url can have multiple kml and marker parameters.<br>' +
+                    'Possible maps are peruskartta, ortokuvat, opentopomap and mapant.'
+                '</p>' +
+                    '</div>' +
+                    '</div>';
+                infoPopup.close();
+                infoWindow.setContent(contentString);
+                infoWindow.setPosition(map.getCenter());
+                infoWindow.open(map);
+            };
+            settingsDiv.appendChild(settingsHelpButton);
+
+            // Info button
+            var settingsInfoButton = document.createElement("BUTTON");
+            settingsInfoButton.style.marginLeft = '11px'
+            settingsInfoButton.appendChild(document.createTextNode("Info"));
+            settingsInfoButton.onclick = function () {
+                console.log("settingsDiv Info clicked");
+                infoPopup.close();
+                infoWindow.close();
+                var contentString = '<div id="content">' +
+                    '<div id="siteInfo">' +
+                    '</div>' +
+                    '<h3 id="infoHeading" class="infoHeading">Attribution</h3>' +
+                    '<div id="bodyContent">' +
+                    '<p>' +
+                    'Roadmap and satellite images from Google.' +
+                    '</p><p>' +
+                    'Topography maps and aerial images from Maanmittauslaitos:<br>' +
+                    '<a href=https://www.maanmittauslaitos.fi/>https://www.maanmittauslaitos.fi/</a>' +
+                    '</p><p>' +
+                    'Ortoilmakuvat and optionally Maastokartat hosted by:<br>' +
+                    '<a href=https://www.kapsi.fi/>https://www.kapsi.fi/</a>' +
+                    '</p><p>' +
+                    'MapAnt maps created and hosted by:<br>' +
+                    '<a href=https://www.mapant.fi/>https://www.mapant.fi/</a>' +
+                    '</p><p>' +
+                    'OpenTopoMap data: © OpenStreetMap contributors, SRTM | map style: © OpenTopoMap (CC-BY-SA)' +
+                    '</p><p>' +
+                    'Maps for Parenteesikartat layer are from book:<br>' +
+                    'Pekka Silvast, 1991. Porkkala 1944–1956 - Neuvostoliiton merisotilaallinen tukikohta. Tutkimusraportti, Sotamuseo 1/1991.' +
+                    '</p></p> ' +
+                    'Lynx layer data created by Kirkkonummi Orienteering Club Lynx:<br>' +
+                    '<a href=https://www.lynx.fi/index.php/parenteesi-suunnistuskartalle>Parenteesi suunnistuskartalle</a>' +
+                    '</p><p>' +
+                    'Muinaisjäännökset and Maailmaperintökohteet data from Museovirasto:<br>' +
+                    '<a href=https://www.museovirasto.fi>Museovirasto</a>' +
+                    '</p></p> ' +
+                    'Planetskier layer data from:<br>' +
+                    '<a href=https://planetskier.blogspot.fi/>Planetskier</a>' +
+                    '</p></p> ' +
+                    'Espoon lähiretkiä layer data is from my own trips around Espoo, Finland.<br>' +
+                    '</p></p> ' +
+                    'Parenteesipisteet data is from Parenteesikartat layer maps and other sources.<br>' +
+                    '</p></p> ' +
+                    'Luolanimistö and Muut mielenkiintoiset nimet from <a href=https://nimisampo.fi/>Nimisampo</a>.<br>' +
+                    '</p></p> ' +
+                    'Luolaseuran luolat data is from <a href=https://caving.fi/>Suomen luolaseura</a> and<br>' +
+                    'from book <a href=https://www.salakirjat.net/product/242/suomen-luolat>Suomen luolat</a>.<br>' +
+                    '</p></p> ' +
+                    'Lintornit from Google My Maps <a href=https://www.google.com/maps/d/u/0/viewer?mid=1V0G10JDy6RxPXmN_eyyFb-5MT0E&ll=65.09362197686224%2C25.329884500000027&z=6>Suomen vesi-, näkö- ja lintutornit</a>'
+                '</p></p> ' +
+                    '</div>' +
+                    '</div>';
+                infoPopup.close();
+                infoWindow.setContent(contentString);
+                infoWindow.setPosition(map.getCenter());
+                infoWindow.open(map);
+            };
+            settingsDiv.appendChild(settingsInfoButton);
+
+
+            // ------------------------------------------------------------
+            // initMap: Crosshair to show the map center
+
+            var crosshairShape = { coords: [0, 0, 0, 0], type: 'rect' };
+            centerMarker = new google.maps.Marker({
+                map: map,
+                icon: 'https://www.daftlogic.com/images/cross-hairs.gif',
+                shape: crosshairShape
+            });
+            centerMarker.bindTo('position', map, 'center');
+            centerMarker.setVisible(!autoMove);
+
+            // ------------------------------------------------------------
+            // initMap: Peruskartta 
+
+            var perusMapType = new google.maps.ImageMapType({
+                getTileUrl: function (coord, zoom) {
+                    if (use_kapsi_maastokartat) {
+                        var url = "https://tiles.kartat.kapsi.fi/peruskartta/" + zoom + "/" +
+                            coord.x + "/" + coord.y + ".jpg";
+                        return url;
+                    } else {
+                        var url = "https://avoin-karttakuva.maanmittauslaitos.fi/avoin/wmts/1.0.0/maastokartta/default/WGS84_Pseudo-Mercator/" + zoom + "/" +
+                            coord.y + "/" + coord.x + ".png?api-key=API_KEY";
+                        //console.log('Peruskartta url='+url);
+                        return url;
+                    }
+                },
+                tileSize: new google.maps.Size(256, 256),
+                maxZoom: 18,
+                minZoom: 0,
+                name: 'Maasto'
+            });
+
+            map.mapTypes.set('peruskartta', perusMapType);
+
+            // ------------------------------------------------------------
+            // initMap: Ortoilmakuvat
+
+            var ortoMapType = new google.maps.ImageMapType({
+                getTileUrl: function (coord, zoom) {
+                    if (use_kapsi_ortokuvat) {
+                        var url = "https://tiles.kartat.kapsi.fi/ortokuva/" + zoom + "/" +
+                            coord.x + "/" + coord.y + ".png";
+                        //console.log('Ortokuvat url='+url);
+                        return url;
+                    } else {
+                        var url = "https://avoin-karttakuva.maanmittauslaitos.fi/avoin/wmts/1.0.0/ortokuva/default/WGS84_Pseudo-Mercator/" + zoom + "/" +
+                            coord.y + "/" + coord.x + ".png?api-key=API_KEY";
+                        //console.log('Ortokuvat url='+url);
+                        return url;
+                    }
+                },
+                tileSize: new google.maps.Size(256, 256),
+                maxZoom: 19,
+                minZoom: 0,
+                name: 'Ilma'
+            });
+
+            map.mapTypes.set('ortokuvat', ortoMapType);
+
+            // ------------------------------------------------------------
+            // initMap: Open Topo Map 
+
+            var opentopoMapType = new google.maps.ImageMapType({
+                getTileUrl: function (coord, zoom) {
+                    var url = "https://" + opentopomap_site + ".tile.opentopomap.org/" + zoom + "/" + coord.x + "/" + coord.y + ".png";
+                    //console.log('OpenTopoMap url='+url);
+                    return url;
+                },
+                tileSize: new google.maps.Size(256, 256),
+                maxZoom: 17,
+                minZoom: 0,
+                name: 'OpenTopo'
+            });
+
+            map.mapTypes.set('opentopomap', opentopoMapType);
+
+            // ------------------------------------------------------------
+            // initMap: MapAnt 
+
+            var mapantMapType = new google.maps.ImageMapType({
+                getTileUrl: function (coord, zoom) {
+                    var url = 'https://wmts.mapant.fi/wmts_EPSG3857.php?z=' + zoom + '&x=' + coord.x + '&y=' + coord.y;
+                    //console.log('MapAnt url='+url);
+                    return url;
+                },
+                tileSize: new google.maps.Size(256, 256),
+                maxZoom: 19,
+                minZoom: 7,
+                name: 'MapAnt'
+            });
+
+            map.mapTypes.set('mapant', mapantMapType);
+
+            // ------------------------------------------------------------
+            // initMap: Init some variables
+
+            marker = null;
+            infoWindow = new google.maps.InfoWindow;
+            infoPopup = new google.maps.InfoWindow;
+            infoBottomWindow = new google.maps.InfoWindow({
+                disableAutoPan: true,
+                pixelOffset: new google.maps.Size(0, -50) // Set the y-axis offset to -50 pixels
+            });
+
+            function setDivStyle(div) {
+                div.style.backgroundColor = '#fff';
+                div.style.border = '2px solid #fff';
+                div.style.borderRadius = '3px';
+                div.style.boxShadow = '0 2px 6px rgba(0,0,0,.3)';
+            }
+
+            // ----------------------------------------------------------
+            // initMap: GPS icon to center the map
+
+            var gpsDiv = document.createElement('div');
+            var gpsButton = document.createElement("IMG");
+            gpsButton.src = 'https://ruuth.xyz/ic_gps_fixed_black_24px.svg';
+            gpsButton.addEventListener('click', function () {
+                map.panTo(current_location);
+                autoMove = true;
+                centerMarker.setVisible(!autoMove);
+                console.log("click Center Map:autoMove=true");
+            });
+            setDivStyle(gpsDiv);
+            gpsDiv.style.marginRight = '11px';
+            gpsDiv.appendChild(gpsButton);
+            map.controls[google.maps.ControlPosition.RIGHT_CENTER].push(gpsDiv);
+
+            // ----------------------------------------------------------
+            // initMap: Buttons for extarnal maps: 
+            //    1956 - Kirkkonummi aerial images from 1956
+            //    MML Laser - Maanmittauslaitos laser scan for surface structures
+
+            var externalMapsDiv = document.createElement('div');
+            var button1956 = document.createElement("BUTTON");
+            var button1956Text = document.createTextNode("1956");
+            button1956.appendChild(button1956Text);
+            button1956.addEventListener('click', function () {
+                // save current state in case we return back
+                saveState();
+                var map_center = map.getCenter();
+                // convert map coordinates to ETRS-GK25 (EPSG:3879) that is used for aerial photos
+                /*
+                var coord = proj4('ETRS-GK25', [map_center.lng(), map_center.lat()]);
+                var link = "https://kirkkonummi.karttatiimi.fi/?setlanguage=fi&e="+coord[0]+"&n="+coord[1]+"&r=1&w=&l=orto1954&o=100"+
+                           "&geom=POINT("+coord[0]+"%20"+coord[1]+")";
+                */
+                var coord = proj4('ETRS-TM35FIN', [map_center.lng(), map_center.lat()]);
+                var link = "https://kartta.paikkatietoikkuna.fi/?zoomLevel=10&coord=" + coord[0] + "_" + coord[1] + "&mapLayers=801+100+default,3400+100+" +
+                    "ortokuva:indeksi&markers=2|1|ffde00|" + coord[0] + "_" + coord[1] + "|&timeseries=1956&noSavedState=true&showIntro=false&lang=fi";
+                console.log("click 1956: jump to page " + link);
+                //alert('jump to 1956');
+                window.location.href = link;
+            });
+            externalMapsDiv.appendChild(button1956);
+
+            var buttonLaser = document.createElement("BUTTON");
+            var buttonLaserText = document.createTextNode("MML Laser");
+            buttonLaser.appendChild(buttonLaserText);
+            buttonLaser.addEventListener('click', function () {
+                // save current state in case we return back
+                saveState();
+                var map_center = map.getCenter();
+                // convert map coordinates to ETRS-TM35FIN (EPSG:3067) that is used for maanmittauslaitos maps
+                var coord = proj4('ETRS-TM35FIN', [map_center.lng(), map_center.lat()]);
+                var link = "https://asiointi.maanmittauslaitos.fi/karttapaikka/?share=customMarker&" +
+                    "n=" + coord[1] + "&e=" + coord[0] +
+                    "&desc=&zoom=10&layers=%5B%7B%22id%22%3A186%2C%22opacity%22%3A50%7D%5D";
+                console.log("click Laser: jump to page " + link);
+                //alert('jump to MML');
+                window.location.href = link;
+            });
+            externalMapsDiv.appendChild(buttonLaser);
+
+            var buttonGoogleMaps = document.createElement("BUTTON");
+            var buttonGoogleMapsText = document.createTextNode("Google");
+            buttonGoogleMaps.appendChild(buttonGoogleMapsText);
+            buttonGoogleMaps.addEventListener('click', function () {
+                // save current state in case we return back
+                saveState();
+                var map_center = map.getCenter();
+                var link = "https://www.google.com/maps/place/" + map_center.lat() + "," + map_center.lng();
+                console.log("click Google: jump to page " + link);
+                //alert('jump to MML');
+                window.location.href = link;
+            });
+            externalMapsDiv.appendChild(buttonGoogleMaps);
+
+            externalMapsDiv.appendChild(document.createElement("BR"));
+            externalMapsDiv.appendChild(document.createElement("BR"));
+
+            mapInfoText = document.createTextNode("info");
+            mapInfoTextDiv = document.createElement('div');
+            mapInfoTextDiv.innerHTML = ' ';
+            mapInfoTextDiv.style.textAlign = "center";
+            externalMapsDiv.appendChild(mapInfoTextDiv);
+            //externalMapsDiv.style.marginBottom = '22px';
+            externalMapsDiv.style.marginBottom = '2px';
+
+            map.controls[google.maps.ControlPosition.BOTTOM_CENTER].push(externalMapsDiv);
+
+            // ----------------------------------------------------------
+            // initMap: dialog for layers
+
+            var layersDiv = document.createElement('div');
+            var layersButton = document.createElement("IMG");
+            layersButton.src = 'https://ruuth.xyz/ic_layers_black_24px.svg';
+            layersButton.addEventListener('click', function () {
+                console.log("click Layer, layerDialogDiv");
+                infoPopup.close();
+                infoWindow.close();
+                infoWindow.setContent(layerDialogDiv);
+                infoWindow.setPosition(map.getCenter());
+                infoWindow.open(map);
+            });
+            setDivStyle(layersDiv);
+            layersDiv.style.marginLeft = '11px';
+            layersDiv.appendChild(layersButton);
+            map.controls[google.maps.ControlPosition.LEFT_CENTER].push(layersDiv);
+
+            // ----------------------------------------------------------
+            // initMap: dialog for settings
+
+            var settingsButtonDiv = document.createElement('div');
+            var settingsButton = document.createElement("IMG");
+            settingsButton.src = 'https://ruuth.xyz/ic_settings_black_24px.svg';
+            settingsButton.addEventListener('click', function () {
+                console.log("click Settings");
+
+                var map_center = map.getCenter();
+
+                coordinatesBox.value = String(map_center.lat()) + ',' + String(map_center.lng());
+                coordinatesBox.defaultValue = coordinatesBox.value;
+
+                mapLinkBox.value = "https://ruuth.xyz/map.html?center=" + String(map_center.lat()) + ',' + String(map_center.lng());
+                mapLinkBox.defaultValue = coordinatesBox.value;
+
+                infoPopup.close();
+                infoWindow.close();
+                infoWindow.setContent(settingsDiv);
+                infoWindow.setPosition(map_center);
+                infoWindow.open(map);
+
+            });
+            setDivStyle(settingsButtonDiv);
+            settingsButtonDiv.style.marginLeft = '11px';
+            settingsButtonDiv.appendChild(settingsButton);
+            map.controls[google.maps.ControlPosition.LEFT_BOTTOM].push(settingsButtonDiv);
+
+            // ------------------------------------------------------------
+            // initMap: Geolocation error
+
+            function handleLocationError(browserHasGeolocation, infoWindow, pos) {
+                var msg = browserHasGeolocation ?
+                    'Error: The Geolocation service failed.' :
+                    'Error: Your browser doesn\'t support geolocation.';
+                console.log(msg);
+                infoPopup.close();
+                infoWindow.close();
+                infoWindow.setPosition(pos);
+                infoWindow.setContent(msg);
+                infoWindow.open(map);
+            }
+
+            // ------------------------------------------------------------
+            // initMap: Event listener for map type change (toggle stree view)
+
+            map.addListener('maptypeid_changed', function () {
+                var showStreetViewControl = true;
+                if (map.getMapTypeId() == 'peruskartta') {
+                    if (use_kapsi_maastokartat) {
+                        mapInfoTextDiv.innerHTML = 'Maanmittauslaitos, Kapsi';
+                    } else {
+                        mapInfoTextDiv.innerHTML = 'Maanmittauslaitos';
+                    }
+                    showStreetViewControl = false;
+                } else if (map.getMapTypeId() == 'ortokuvat') {
+                    if (use_kapsi_ortokuvat) {
+                        mapInfoTextDiv.innerHTML = 'Maanmittauslaitos, Kapsi';
+                    } else {
+                        mapInfoTextDiv.innerHTML = 'Maanmittauslaitos';
+                    }
+                    showStreetViewControl = false;
+                } else if (map.getMapTypeId() == 'mapant') {
+                    mapInfoTextDiv.innerHTML = 'Maanmittauslaitos, MapAnt';
+                    showStreetViewControl = false;
+                } else if (map.getMapTypeId() == 'opentopomap') {
+                    mapInfoTextDiv.innerHTML = 'OpenStreetMap, OpenTopoMap';
+                    showStreetViewControl = false;
+                } else {
+                    mapInfoTextDiv.innerHTML = '';
+                }
+                map.setOptions({
+                    streetViewControl: showStreetViewControl
+                });
+            });
+
+            // ------------------------------------------------------------
+            // initMap: Event listener for user moving the map manually
+
+            map.addListener('dragstart', function () {
+                if (autoMove) {
+                    console.log('dragstart: set autoMove=false');
+                }
+                autoMove = false;
+                centerMarker.setVisible(!autoMove);
+            });
+
+            // ------------------------------------------------------------
+            // initMap: Event listener for user zooming the map
+
+            google.maps.event.addListener(map, 'zoom_changed', function () {
+                var old_radius = circle_radius;
+                updateCircleRadius(map.getZoom());
+                if (old_radius != circle_radius) {
+                    console.log("zoom_changed, change circle radius");
+                    for (var i = 0; i < path.length; i++) {
+                        path[i].setRadius(circle_radius);
+                    }
+                }
+            });
+
+            // initMap: Event listener for right click
+            google.maps.event.addListener(map, 'rightclick', function (event) {
+                var pos = event.latLng;
+                lastRightClickPos = pos;
+                infoPopup.close();
+                infoWindow.close();
+                infoWindow.setPosition(pos);
+                if (measureDistanceMode != 0) {
+                    // We are in measure distance mode.
+                    measureDistanceEvent(pos);
+                } else {
+                    var content = '<p>View on Google Maps: <a href=https://www.google.com/maps/place/' + pos.lat + ',' + pos.lng + ' target=_blank>' + pos.lat + ',' + pos.lng + '</a>' +
+                        '<img src="https://ruuth.xyz/ic_open_in_new.svg" style="height:20px"></p>';
+                    // add clickable option to infobox to measure distance
+                    content += '<p><a href="javascript:startMeasureDistance()" style="color:blue">Measure distance</a></p>';
+                    console.log(content);
+                    infoWindow.setContent(content);
+                    infoWindow.open(map);
+                }
+            });
+
+            google.maps.event.addListener(map, 'click', function (event) {
+                if (measureDistanceMode != 0) {
+                    // We are in measure distance mode.
+                    console.log("click");
+                    var pos = event.latLng;
+                    measureDistanceEvent(pos);
+                }
+            });
+
+            google.maps.event.addListener(map, 'touchend', function (event) {
+                if (measureDistanceMode != 0) {
+                    // We are in measure distance mode.
+                    console.log("touchend");
+                    var touch = event.changedTouches[0];
+                    var point = new google.maps.Point(touch.clientX, touch.clientY);
+                    var pos = overlay.getProjection().fromContainerPixelToLatLng(point);
+                    console.log("touchend: " + pos);
+                    measureDistanceEvent(pos);
+                }
+            });
+
+
+            // ------------------------------------------------------------
+            // Options for getting position
+
+            options = {
+                enableHighAccuracy: true,
+                timeout: Infinity,
+                maximumAge: 10000
+            };
+
+            // ------------------------------------------------------------
+            // Try HTML5 geolocation.
+
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    updatePosition,
+                    function () {
+                        handleLocationError(true, infoWindow, map.getCenter());
+                    });
+                id = navigator.geolocation.watchPosition(updatePosition, watchError, options);
+            } else {
+                // Browser doesn't support Geolocation
+                handleLocationError(false, infoWindow, map.getCenter());
+            }
+        } // initMap: end
+
+        // Calculate distance between points that the user clicks on the map
+        function calcDistance(p1, p2) {
+            return google.maps.geometry.spherical.computeDistanceBetween(p1, p2);
+        }
+
+        // Add a line to the map between clicked points
+        function addLineToMeasureDistancePath(p1, p2) {
+            var line = new google.maps.Polyline({
+                path: [p1, p2],
+                strokeColor: "#FF0000",
+                strokeWeight: 4,
+                map: map
+            });
+            measureDistancePath.push(line);
+            // Add circle at the end of the line
+            measureDistancePath.push(distancePathCircle(p2));
+        }
+
+        function measureDistanceEvent(pos) {
+            console.log("measureDistanceEvent");
+            if (measureDistanceMode == 1) {
+                measureDistanceMode = 2;
+                startMeasureDistanceFromPos(pos);
+            } else {
+                addLineToMeasureDistancePath(measureDistanceLastPos, pos);
+                measureDistanceLength += calcDistance(measureDistanceLastPos, pos);
+                measureDistanceLastPos = pos;
+                showMeasureDistance();
+            }
+        }
+
+        // Clear lines from the map
+        function clearMeasureDistancePath() {
+            for (var i = 0; i < measureDistancePath.length; i++) {
+                measureDistancePath[i].setMap(null);
+            }
+            measureDistancePath = [];
+        }
+
+        function startMeasureDistanceFromPos(pos) {
+            console.log("startMeasureDistanceFromPos");
+            measureDistancePath = [];
+            measureDistanceLastPos = pos;
+            showMeasureDistance();
+        }
+
+        // Start distance mesuring from right click menu, we already have a starting position
+        function startMeasureDistance() {
+            console.log("startMeasureDistance");
+            measureDistanceMode = 2;
+            startMeasureDistanceFromPos(lastRightClickPos);
+        }
+
+        // Start distance mesuring from tools menu button, first get the starting position
+        function startMeasureDistanceFromButton() {
+            console.log("startMeasureDistanceFromButton");
+            measureDistanceMode = 1;
+            measureDistancePath = [];
+            showMeasureDistance();
+        }
+
+        function stopMeasureDistance() {
+            console.log("stopMeasureDistance");
+            clearMeasureDistancePath();
+            infoBottomWindow.close();
+            measureDistancePath = null;
+            measureDistanceLength = 0;
+            measureDistanceMode = 0;
+        }
+
+        function showMeasureDistance() {
+            if (measureDistanceMode == 1) {
+                infoWindow.close();
+                var content = "<p>Click or tap the map to set the starting point</p>";
+            } else if (measureDistanceLength == 0) {
+                infoWindow.close();
+                measureDistancePath.push(distancePathCircle(measureDistanceLastPos));
+                var content = "<p>Click or tap on the map to add points to the path</p>";
+            } else if (measureDistanceLength >= 10000) {
+                var content = "<p>Distance: " + (measureDistanceLength / 1000).toFixed(2) + " km</p>";
+            } else {
+                var content = "<p>Distance: " + measureDistanceLength.toFixed(2) + " m</p>";
+            }
+            content += '<p><a href="javascript:stopMeasureDistance()" style="color:blue">Stop measuring</a></p>';
+
+            infoBottomWindow.setContent(content);
+            infoBottomWindow.setPosition(infoBottomWindowPos);
+            infoBottomWindow.open(map);
+        }
+
+        // ------------------------------------------------------------
+        // Update current position in the map
+
+        function updatePosition(position) {
             var pos = {
                 lat: position.coords.latitude,
                 lng: position.coords.longitude
@@ -1779,113 +1819,113 @@
                 // create marker
                 marker = new google.maps.Marker({
                     position: current_location,
-                    map: map                 
+                    map: map
                 });
                 // click the marker to get coordinates
-                marker.addListener('click', function() {
+                marker.addListener('click', function () {
                     infoPopup.close();
                     infoWindow.close();
                     infoWindow.setPosition(current_location);
                     infoWindow.setContent('Lat: ' + current_location.lat + ' Lng: ' + current_location.lng);
                     infoWindow.open(map);
-                  });
+                });
             }
             if (autoMove) {
-              map.panTo(current_location);
+                map.panTo(current_location);
             }
-      }
+        }
 
-      // ------------------------------------------------------------
-      // Error function for position change watch
+        // ------------------------------------------------------------
+        // Error function for position change watch
 
-      function watchError(err) {
-        infoPopup.close();
-        infoWindow.close();
-        infoWindow.setPosition(pos);
-        infoWindow.setContent('Watch Error(' + err.code + '): ' + err.message);
-        console.log('Watch Error(' + err.code + '): ' + err.message);
-        infoWindow.open(map);
-      }
+        function watchError(err) {
+            infoPopup.close();
+            infoWindow.close();
+            infoWindow.setPosition(pos);
+            infoWindow.setContent('Watch Error(' + err.code + '): ' + err.message);
+            console.log('Watch Error(' + err.code + '): ' + err.message);
+            infoWindow.open(map);
+        }
 
-      // ------------------------------------------------------------
-      // add event listeners for page show/hide so we can continue 
-      // from same state
+        // ------------------------------------------------------------
+        // add event listeners for page show/hide so we can continue 
+        // from the same state
 
-      window.addEventListener('pageshow', function(event) {
-        console.log("pageshow");
-        restoreState(false);
-        showVisibleLayers();
-      });
+        window.addEventListener('pageshow', function (event) {
+            console.log("pageshow");
+            restoreState(false);
+            showVisibleLayers();
+        });
 
-      window.addEventListener('pagehide', function(event) {
-        console.log("pagehide");
-        saveState();
-      });
+        window.addEventListener('pagehide', function (event) {
+            console.log("pagehide");
+            saveState();
+        });
 
-      // ------------------------------------------------------------
-      // Function to create a circle for the path
-      function pathCircle(loc) {
-        var new_circle = new google.maps.Circle({
-                                  strokeColor: '#FF0000',
-                                  strokeOpacity: 0.8,
-                                  strokeWeight: 2,
-                                  fillColor: '#FF0000',
-                                  fillOpacity: 0.35,
-                                  map: map,
-                                  center: loc,
-                                  radius: circle_radius,
-                                  clickable : false
-                                });
-          return(new_circle);
-      }
+        // ------------------------------------------------------------
+        // Function to create a circle for the path
+        function pathCircle(loc) {
+            var new_circle = new google.maps.Circle({
+                strokeColor: '#FF0000',
+                strokeOpacity: 0.8,
+                strokeWeight: 2,
+                fillColor: '#FF0000',
+                fillOpacity: 0.35,
+                map: map,
+                center: loc,
+                radius: circle_radius,
+                clickable: false
+            });
+            return (new_circle);
+        }
 
-      function distancePathCircle(loc) {
-        var new_circle = new google.maps.Circle({
-                                  strokeColor: '#000000',
-                                  strokeWeight: 3,
-                                  fillColor: '#FFFFFF',
-                                  map: map,
-                                  center: loc,
-                                  radius: circle_radius,
-                                  clickable : false
-                                });
-          return(new_circle);
-      }
+        function distancePathCircle(loc) {
+            var new_circle = new google.maps.Circle({
+                strokeColor: '#000000',
+                strokeWeight: 3,
+                fillColor: '#FFFFFF',
+                map: map,
+                center: loc,
+                radius: circle_radius,
+                clickable: false
+            });
+            return (new_circle);
+        }
 
 
-      // ------------------------------------------------------------
-      // function to be called periodically to show path
+        // ------------------------------------------------------------
+        // function to be called periodically to show path
 
-      if (maxpath > 0) {
-        setInterval(function() {
-          if (path.length > 0 && map) {
-            // check that we have moved enough to add a new marker
-            var distance = google.maps.geometry.spherical.computeDistanceBetween(
+        if (maxpath > 0) {
+            setInterval(function () {
+                if (path.length > 0 && map) {
+                    // check that we have moved enough to add a new marker
+                    var distance = google.maps.geometry.spherical.computeDistanceBetween(
                         new google.maps.LatLng(current_location),
                         path[0].getCenter());
-            if (distance < recording_distance) {
-              // we record new point only if we have moved enough
-              console.log('Do not add new element, too short distance='+distance+',path.length='+path.length);
-              return;
-            }
-          }        
-          while (path.length > maxpath) {
-            // hide old element
-            path[path.length - 1].setMap(null);
-            // remove from path
-            path.pop();
-          }
+                    if (distance < recording_distance) {
+                        // we record new point only if we have moved enough
+                        console.log('Do not add new element, too short distance=' + distance + ',path.length=' + path.length);
+                        return;
+                    }
+                }
+                while (path.length > maxpath) {
+                    // hide old element
+                    path[path.length - 1].setMap(null);
+                    // remove from path
+                    path.pop();
+                }
 
-          // Add new circle to the map.
-          var new_circle = pathCircle(current_location);
-          // add as the first element in path
-          path.unshift(new_circle);
-        }, pathinterval);
-      }
+                // Add new circle to the map.
+                var new_circle = pathCircle(current_location);
+                // add as the first element in path
+                path.unshift(new_circle);
+            }, pathinterval);
+        }
 
     </script>
-    <script async defer
-    src="https://maps.googleapis.com/maps/api/js?key=XXX API_KEY XXX&callback=initMap">
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key=XXX API_KEY XXX&callback=initMap">
     </script>
-  </body>
+</body>
+
 </html>
