@@ -1656,7 +1656,7 @@
                     // We are in measure distance mode.
                     measureDistanceEvent(pos);
                 } else {
-                    var content = '<p>View on Google Maps: <a href=https://www.google.com/maps/place/' + pos.lat + ',' + pos.lng + ' target=_blank>' + pos.lat + ',' + pos.lng + '</a>' +
+                    var content = '<p>View on Google Maps: <a href=https://www.google.com/maps/place/' + pos.lat() + ',' + pos.lng() + ' target=_blank>' + pos.lat() + ',' + pos.lng() + '</a>' +
                         '<img src="https://ruuth.xyz/ic_open_in_new.svg" style="height:20px"></p>';
                     // add clickable option to infobox to measure distance
                     content += '<p><a href="javascript:startMeasureDistance()" style="color:blue">Measure distance</a></p>';
