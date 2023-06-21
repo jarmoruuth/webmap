@@ -33,7 +33,7 @@
         // failed.", it means you probably did not give permission for the browser to
         // locate you.
 
-        var version = "0.45";
+        var version = "0.46";
 
         var map;
         var id, infoWindow, infoPopup, marker, options;
@@ -83,6 +83,11 @@
                 url: null,
                 layer: null
             },    // Array of overlay layers
+            {
+                name: 'Njiellalanjavri', visible: false, type: 'njiellalanjavri',
+                url: null,
+                layer: null
+            },
             {
                 name: 'Planetskier', visible: false, type: 'kml',
                 url: 'https://planetskier.net/locations.kmz',
@@ -211,6 +216,39 @@
                 bounds: {
                     north: 60.141194955843204, south: 60.09062549367392,
                     east: 24.172291194103952, west: 24.101609622143503
+                }
+            }
+        ];
+
+        var gtk_adjust = 0.002
+
+        var overlayNjiellalanjavriMaps = [
+            {
+                url: 'https://ruuth.xyz/test/Njiellalanjavri-dots-only.png',
+                bounds: {
+                    north: 69.2705599, south: 69.1953001,
+                    east: 21.5737423, west: 21.2696416
+                }
+            },
+            /*{
+                url: 'https://ruuth.xyz/test/Njiellalanjavri-Toskaljarvi-dolomite.png',
+                bounds: {
+                    north: 69.274265436016, south: 69.142848282096,
+                    east: 21.532237279298, west: 21.178891283052
+                }
+            },*/
+            /*{
+                url: 'https://ruuth.xyz/test/Njiellalanjavri-Toskaljarvi-dolomite2.png',
+                bounds: {
+                    north: 69.239886813021, south: 69.184494218998,
+                    east: 21.54837565205, west: 21.355036393965
+                }
+            },*/
+            {
+                url: 'https://ruuth.xyz/test/Njiellalanjavri-Toskaljarvi-dolomite2.png',
+                bounds: {
+                    north: 69.239886813021+gtk_adjust, south: 69.184494218998-gtk_adjust,
+                    east: 21.54837565205, west: 21.355036393965
                 }
             }
         ];
@@ -532,6 +570,16 @@
                         layer.layer[layer.layer.length] = newOverlay;
                     }
 
+                } else if (layer.type == 'njiellalanjavri') {
+                    console.log("loadLayer:create new njiellalanjavri layer, layer=", layer.name);
+                    layer.layer = [];
+                    for (var i = 0; i < overlayNjiellalanjavriMaps.length; i++) {
+                        var newOverlay = new google.maps.GroundOverlay(
+                            overlayNjiellalanjavriMaps[i].url,
+                            overlayNjiellalanjavriMaps[i].bounds);
+                        layer.layer[layer.layer.length] = newOverlay;
+                    }
+
                 } else if (layer.type == 'tiled_geojson') {
                     console.log("loadLayer:tiled_geojson, nothing to do");
 
@@ -842,6 +890,10 @@
                     for (var i = 0; i < layer.layer.length; i++) {
                         layer.layer[i].setMap(map);
                     }
+                } else if (layer.type == 'njiellalanjavri') {
+                    for (var i = 0; i < layer.layer.length; i++) {
+                        layer.layer[i].setMap(map);
+                    }
                 } else if (layer.type == 'kml') {
                     layer.layer.setMap(map);
                 } else if (layer.type == 'activityjson') {
@@ -860,6 +912,10 @@
             console.log("hideLayer:layer=", layer.name);
             if (map) {
                 if (layer.type == 'oldmaps') {
+                    for (var i = 0; i < layer.layer.length; i++) {
+                        layer.layer[i].setMap(null);
+                    }
+                } else if (layer.type == 'njiellalanjavri') {
                     for (var i = 0; i < layer.layer.length; i++) {
                         layer.layer[i].setMap(null);
                     }
