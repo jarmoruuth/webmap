@@ -33,7 +33,7 @@
         // failed.", it means you probably did not give permission for the browser to
         // locate you.
 
-        var version = "0.46";
+        var version = "0.47";
 
         var map;
         var id, infoWindow, infoPopup, marker, options;
@@ -63,7 +63,6 @@
         var opentopomap_site = 'a';
         var measureDistanceMode = 0;
         var measureDistancePath = null;
-        var measureDistanceLastPos = null;
         var measureDistanceLength = 0;
         var lastRightClickPos = null;
 
@@ -1775,16 +1774,32 @@
         }
 
         // Add a line to the map between clicked points
-        function addLineToMeasureDistancePath(p1, p2) {
+        function addLineToMeasureDistancePath(p1, p2, distance, length) {
             var line = new google.maps.Polyline({
                 path: [p1, p2],
                 strokeColor: "#FF0000",
                 strokeWeight: 4,
                 map: map
             });
-            measureDistancePath.push(line);
             // Add circle at the end of the line
-            measureDistancePath.push(distancePathCircle(p2));
+            var circle =  distancePathCircle(p2, true);
+            var circlePopup = new google.maps.InfoWindow;
+            circle.addListener("click", () => {
+                console.log("circlePopup:mouseover");
+                var circleInfo = "<p>" +
+                                 "Distance: " + distance.toFixed(2) + " m<br>" +
+                                 "Total distance: " + length.toFixed(2) + " m<br>" +
+                                 "</p>";
+                circlePopup.setContent(circleInfo);
+                circlePopup.setPosition(p2);
+                circlePopup.open(map);
+            });
+            //circle.addListener('mouseout', function (event) {
+            //    console.log("circlePopup:mouseout");
+            //    circlePopup.close();
+            //});
+            var pathItem = { line: line, circle: circle, p1: p1, p2: p2, distance: distance, length: length };
+            measureDistancePath.push(pathItem);
         }
 
         function measureDistanceEvent(pos) {
@@ -1793,8 +1808,9 @@
                 measureDistanceMode = 2;
                 startMeasureDistanceFromPos(pos);
             } else {
-                addLineToMeasureDistancePath(measureDistanceLastPos, pos);
-                measureDistanceLength += calcDistance(measureDistanceLastPos, pos);
+                var distance = calcDistance(measureDistanceLastPos, pos);
+                measureDistanceLength += distance;
+                addLineToMeasureDistancePath(measureDistanceLastPos, pos, distance, measureDistanceLength);
                 measureDistanceLastPos = pos;
                 showMeasureDistance();
             }
@@ -1803,9 +1819,25 @@
         // Clear lines from the map
         function clearMeasureDistancePath() {
             for (var i = 0; i < measureDistancePath.length; i++) {
-                measureDistancePath[i].setMap(null);
+                if (measureDistancePath[i].line) {
+                    measureDistancePath[i].line.setMap(null);
+                }
+                measureDistancePath[i].circle.setMap(null);
             }
             measureDistancePath = [];
+        }
+
+        // Undo last line from the map
+        function undoMeasureDistancePath() {
+            if (measureDistancePath.length > 1) {
+                var last = measureDistancePath.pop();
+                if (last.line) {
+                    last.line.setMap(null);
+                }
+                last.circle.setMap(null);
+                measureDistanceLength -= last.distance;
+                measureDistanceLastPos = last.p1;
+            }
         }
 
         function startMeasureDistanceFromPos(pos) {
@@ -1839,20 +1871,28 @@
             measureDistanceMode = 0;
         }
 
+        function undoMeasureDistance() {
+            console.log("undoMeasureDistance");
+            undoMeasureDistancePath();
+            showMeasureDistance();
+        }
+
         function showMeasureDistance() {
             if (measureDistanceMode == 1) {
                 infoWindow.close();
                 var content = "<p>Click or tap the map to set the starting point</p>";
             } else if (measureDistanceLength == 0) {
                 infoWindow.close();
-                measureDistancePath.push(distancePathCircle(measureDistanceLastPos));
+                var circle = distancePathCircle(measureDistanceLastPos, false);
+                measureDistancePath.push({ line: null, circle: circle, p1: measureDistanceLastPos, p2: measureDistanceLastPos, distance: 0 });
                 var content = "<p>Click or tap on the map to add points to the path</p>";
             } else if (measureDistanceLength >= 10000) {
                 var content = "<p>Distance: " + (measureDistanceLength / 1000).toFixed(2) + " km</p>";
             } else {
                 var content = "<p>Distance: " + measureDistanceLength.toFixed(2) + " m</p>";
             }
-            content += '<p><a href="javascript:stopMeasureDistance()" style="color:blue">Stop measuring</a></p>';
+            content += '<p><a href="javascript:undoMeasureDistance()" style="color:blue">Undo last point</a><br>';
+            content += '<a href="javascript:stopMeasureDistance()" style="color:blue">Stop measuring</a></p>';
 
             infoBottomWindow.setContent(content);
             infoBottomWindow.setPosition(infoBottomWindowPos);
@@ -1935,15 +1975,15 @@
             return (new_circle);
         }
 
-        function distancePathCircle(loc) {
+        function distancePathCircle(loc, clickable) {
             var new_circle = new google.maps.Circle({
                 strokeColor: '#000000',
                 strokeWeight: 3,
                 fillColor: '#FFFFFF',
                 map: map,
                 center: loc,
-                radius: circle_radius,
-                clickable: false
+                radius: 2 * circle_radius,
+                clickable: clickable
             });
             return (new_circle);
         }
