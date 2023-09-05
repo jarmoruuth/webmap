@@ -33,7 +33,7 @@
         // failed.", it means you probably did not give permission for the browser to
         // locate you.
 
-        var version = "0.47";
+        var version = "0.48";
 
         var map;
         var id, infoWindow, infoPopup, marker, options;
@@ -82,6 +82,16 @@
                 url: null,
                 layer: null
             },    // Array of overlay layers
+            {
+                name: 'Huiput yli 1000m', visible: false, type: 'markerjson',
+                url: 'https://ruuth.xyz/huiput1000m.json',
+                layer: null
+            },
+            {
+                name: 'Järvet yli 1000m', visible: false, type: 'markerjson',
+                url: 'https://ruuth.xyz/jarvet1000m.json',
+                layer: null
+            },
             {
                 name: 'Njiellalanjavri', visible: false, type: 'njiellalanjavri',
                 url: null,
@@ -537,6 +547,43 @@
         }
 
         // ------------------------------------------------------------
+        // KKJ coordinate transformation
+        function convertKKJtoWGS84(kkj_n, kkj_e) {
+            var boundaries = [
+                    [1400957.88, 2232435.80, 6626458.25, 7814216.46, "EPSG:2391"],
+                    [2232435.81, 3064277.43, 6626492.03, 7797229.5, "EPSG:2392"],
+                    [3064277.44, 3896717.39, 6626471.36, 7798047.82, "EPSG:2393"],
+                    [3896717.70, 4589271.75, 6626476.77, 7815362.72, "EPSG:2394"]   
+            ];
+            var kkj_zone = null;
+            console.log('KKJ coordinates N', kkj_n, 'E', kkj_e);
+            for (var i = 0; i < 4; i++) {
+                if (kkj_e >= boundaries[i][0] 
+                    && kkj_e <= boundaries[i][1] 
+                    && kkj_n >= boundaries[i][2] 
+                    && kkj_n <= boundaries[i][3]) 
+                {
+                    kkj_zone = boundaries[i][4];
+                    console.log('kkj_zone', kkj_zone);
+                    break;
+                }
+            }
+            if (kkj_zone == null) {
+                console.log('KKJ coordinates outside Finland');
+                alert('KKJ coordinates outside Finland');
+                return null;
+            }  
+            var coord = proj4(kkj_zone, "EPSG:4326", [kkj_e, kkj_n]);
+            console.log('coord', coord);
+            console.log('coord[0]', coord[0], 'coord[1]', coord[1]);
+            var pos = {
+                lat: coord[1],
+                lng: coord[0]
+            }
+            return pos;
+        }
+
+        // ------------------------------------------------------------
         // load layer
 
         function loadLayer(layer) {
@@ -587,6 +634,11 @@
                     loadActivityJSON(layer);
                     return false;
 
+                } else if (layer.type == 'markerjson') {
+                    console.log("loadLayer:MarkerJSON, layer", layer.name);
+                    loadMarkerJSON(layer);
+                    return false;
+
                 } else if (layer.type == 'kmlarray') {
                     console.log("loadLayer:create new kml array layer, layer=", layer.name);
                     layer.layer = [];
@@ -602,6 +654,88 @@
                 console.log("loadLayer:layer already loaded, layer=", layer.name);
             }
             return true;
+        }
+
+        // ------------------------------------------------------------
+        // MarkerJSON layer load/show/hide
+
+        function addRowMarkerJSON(name, value, is_url) {
+            if (value == null || value == undefined) {
+                return '';
+            }
+            if (is_url) {
+                return "<tr><td>" + name + "</td><td><a href=" + value + ">Kartta</a></td></tr>";
+            } else {
+                return "<tr><td>" + name + "</td><td>" + value + "</td></tr>";
+            }
+        }
+
+        function loadMarkerJSON(layer) {
+            console.log('loadMarkerJSON:start fetch');
+            fetch(layer.url)
+                .then(response => response.json())
+                .then(json => {
+                    console.log('loadMarkerJSON:process json');
+                    js = json.data;
+                    var markers = [];
+                    for (var i = 0; i < js.length; i++) {
+                        var infotxt = "<table>";
+                        var data = js[i];
+                        console.log('loadMarkerJSON:process json, data', data);
+                        for (var key in data) {
+                            console.log('loadMarkerJSON:process json', key.toString(), data[key].toString());
+                            infotxt = infotxt + addRowMarkerJSON(key.toString(), data[key].toString(), false);
+                        }
+                        infotxt = infotxt + "<table>";
+                        if (data.lat && data.lng) {
+                            console.log('loadMarkerJSON:assume WGS84 coordinates');
+                            var pos = {
+                                lat: data.lat,
+                                lng: data.lng
+                            }
+                        } else if (data.kkj_n && data.kkj_e) {
+                            console.log('loadMarkerJSON:assume KKJ coordinates');
+                            var pos = convertKKJtoWGS84(data.kkj_n, data.kkj_e);
+                        } else {
+                            var pos = null;
+                        }
+                        if (pos == null) {
+                            console.log('loadMarkerJSON:invalid coordinates, data=', data);
+                            continue;
+                        }
+                        const marker = new google.maps.Marker({
+                            position: pos,
+                            map: map,
+                            title: data.name,
+                            info: infotxt,
+                        });
+                        marker.addListener("click", () => {
+                            infoWindow.setContent(marker.info);
+                            infoWindow.open(map, marker);
+                        });
+                        markers.push(marker);
+                    }
+                    console.log('loadMarkerJSON:layer elements', markers.length);
+                    layer.layer = markers;
+                })
+                .catch(err => console.error(err))
+        }
+
+        function showMarkerJSON(layer) {
+            if (layers == null) {
+                console.log('showMarkerJSON:null layer');
+            } else {
+                console.log('showMarkerJSON:layer elements', layer.length);
+                for (var i = 0; i < layer.length; i++) {
+                    layer[i].setMap(map);
+                }
+            }
+        }
+
+        function hideMarkerJSON(layer) {
+            for (var i = 0; i < layer.length; i++) {
+                layer[i].setMap(null);
+            }
         }
 
         // ------------------------------------------------------------
@@ -895,6 +1029,8 @@
                     }
                 } else if (layer.type == 'kml') {
                     layer.layer.setMap(map);
+                } else if (layer.type == 'markerjson') {
+                    showMarkerJSON(layer.layer);
                 } else if (layer.type == 'activityjson') {
                     showActivityJSON(layer.layer);
                 } else if (layer.type == 'kmlarray') {
@@ -918,6 +1054,8 @@
                     for (var i = 0; i < layer.layer.length; i++) {
                         layer.layer[i].setMap(null);
                     }
+                } else if (layer.type == 'markerjson') {
+                    hideMarkerJSON(layer.layer);
                 } else if (layer.type == 'activityjson') {
                     hideActivityJSON(layer.layer);
                 } else if (layer.type == 'kml') {
@@ -981,10 +1119,20 @@
 
             // initMap: proj4 settings
 
+            // WGS 84: EPSG:4326
+
             // ETRS-TM35FIN (EPSG:3067)
             proj4.defs("ETRS-TM35FIN", "+proj=utm +zone=35 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs");
             // ETRS-GK25 (EPSG:3879)
             proj4.defs("ETRS-GK25", "+proj=tmerc +lat_0=0 +lon_0=25 +k=1 +x_0=25500000 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs");
+            // KKJ to WGS84 (EPSG:1637)
+            proj4.defs("EPSG:1639","+proj=pipeline +step +proj=axisswap +order=2,1 +step +proj=unitconvert +xy_in=deg +xy_out=rad +step +proj=push +v_3 +step +proj=cart +ellps=intl +step +proj=helmert +x=-90.7 +y=-106.1 +z=-119.2 +rx=4.09 +ry=0.218 +rz=-1.05 +s=1.37 +convention=position_vector +step +inv +proj=cart +ellps=WGS84 +step +proj=pop +v_3 +step +proj=unitconvert +xy_in=rad +xy_out=deg +step +proj=axisswap +order=2,1");
+            proj4.defs("EPSG:10099","+proj=pipeline +step +proj=axisswap +order=2,1 +step +proj=unitconvert +xy_in=deg +xy_out=rad +step +proj=push +v_3 +step +proj=cart +ellps=intl +step +proj=helmert +x=-96.062 +y=-82.428 +z=-121.753 +rx=-4.801 +ry=-0.345 +rz=1.376 +s=1.496 +convention=coordinate_frame +step +inv +proj=cart +ellps=WGS84 +step +proj=pop +v_3 +step +proj=unitconvert +xy_in=rad +xy_out=deg +step +proj=axisswap +order=2,1");
+            // KKJ / Finland zone 4 (EPSG:2394)
+            proj4.defs("EPSG:2391","+proj=tmerc +lat_0=0 +lon_0=21 +k=1 +x_0=1500000 +y_0=0 +ellps=intl +towgs84=-96.062,-82.428,-121.753,-4.801,-0.345,1.376,1.496 +units=m +no_defs +type=crs");
+            proj4.defs("EPSG:2392","+proj=tmerc +lat_0=0 +lon_0=24 +k=1 +x_0=2500000 +y_0=0 +ellps=intl +towgs84=-96.062,-82.428,-121.753,-4.801,-0.345,1.376,1.496 +units=m +no_defs +type=crs");
+            proj4.defs("EPSG:2393","+proj=tmerc +lat_0=0 +lon_0=27 +k=1 +x_0=3500000 +y_0=0 +ellps=intl +towgs84=-96.062,-82.428,-121.753,-4.801,-0.345,1.376,1.496 +units=m +no_defs +type=crs");
+            proj4.defs("EPSG:2394","+proj=tmerc +lat_0=0 +lon_0=30 +k=1 +x_0=4500000 +y_0=0 +ellps=intl +towgs84=-96.062,-82.428,-121.753,-4.801,-0.345,1.376,1.496 +units=m +no_defs +type=crs");
 
             // initMap: create map
 
@@ -1106,6 +1254,9 @@
             coordinatesBox = document.createElement("INPUT");
             coordinatesBox.setAttribute("type", "text");
             settingsDiv.appendChild(coordinatesBox);
+            settingsDiv.appendChild(document.createElement("BR"));
+            settingsDiv.appendChild(document.createTextNode('Coordinates format: <lat>,<lng> or KKJ <N>,<E>'));
+            settingsDiv.appendChild(document.createElement("BR"));
             settingsDiv.appendChild(document.createElement("BR"));
 
             settingsDiv.appendChild(document.createTextNode('Map link to center coordinates:'));
@@ -1265,15 +1416,30 @@
                 // check if new center coordinates have been given
                 var new_center = coordinatesBox.value;
                 if (new_center && new_center.length > 3
-                    && new_center != coordinatesBox.defaultValue) {
+                    && new_center != coordinatesBox.defaultValue) 
+                {
+                    // Halti: KKJ 7691965,1510654 ->  69.3079,21.2649
                     console.log('new_center=' + new_center + ',defaultValue=' + coordinatesBox.defaultValue);
+                    var conversion = new_center.split(' ');
+                    if (conversion[0] == 'KKJ') {
+                        console.log('Input in KKJ coordinates');
+                        new_center = conversion.splice(1).join(' ');
+                    }
                     var lat_lng = new_center.split(',');
                     if (lat_lng[0] && lat_lng[1]) {
-                        var pos = {
-                            lat: Number(lat_lng[0]),
-                            lng: Number(lat_lng[1])
+                        if (conversion[0] == 'KKJ') {
+                            var kkj_n = parseFloat(lat_lng[0]);
+                            var kkj_e = parseFloat(lat_lng[1]);
+                            var pos = convertKKJtoWGS84(kkj_n, kkj_e);
+                        } else {
+                            var pos = {
+                                lat: Number(lat_lng[0]),
+                                lng: Number(lat_lng[1])
+                            }
                         }
-                        map.panTo(pos);
+                        if (pos) {
+                            map.panTo(pos);
+                        }
                         autoMove = false;
                     }
                 }
