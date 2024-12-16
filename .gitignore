@@ -48,3 +48,4 @@ Temporary Items
 
 # utility files
 *.bat
+.tmp.driveupload

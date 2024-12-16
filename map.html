@@ -33,7 +33,7 @@
         // failed.", it means you probably did not give permission for the browser to
         // locate you.
 
-        var version = "0.48";
+        var version = "0.49";
 
         var map;
         var id, infoWindow, infoPopup, marker, options;
@@ -93,7 +93,7 @@
                 layer: null
             },
             {
-                name: 'Njiellalanjavri', visible: false, type: 'njiellalanjavri',
+                name: 'Njiellalanjavri-Toscal dolomites', visible: false, type: 'njiellalanjavri',
                 url: null,
                 layer: null
             },
@@ -161,7 +161,10 @@
                 name: 'ilma', altnames: ['ortokuvat', 'ilma', 'ortoilmakuvat'], visible: true
             },
             {
-                name: 'opentopo', altnames: ['opentopomap', 'opentopo'], visible: false
+                name: 'opentopo', altnames: ['opentopomap', 'opentopo'], visible: true
+            },
+            {
+                name: 'openstreet', altnames: ['openstreetpmap', 'openstreet'], visible: true
             },
             {
                 name: 'mapant', altnames: ['MapAnt'], visible: false
@@ -239,13 +242,13 @@
                     east: 21.5737423, west: 21.2696416
                 }
             },
-            /*{
-                url: 'https://ruuth.xyz/test/Njiellalanjavri-Toskaljarvi-dolomite.png',
+            {
+                url: 'https://ruuth.xyz/test/Njiellalanjavri-Toskaljarvi-dolomite3.png',
                 bounds: {
                     north: 69.274265436016, south: 69.142848282096,
                     east: 21.532237279298, west: 21.178891283052
                 }
-            },*/
+            },
             /*{
                 url: 'https://ruuth.xyz/test/Njiellalanjavri-Toskaljarvi-dolomite2.png',
                 bounds: {
@@ -253,13 +256,13 @@
                     east: 21.54837565205, west: 21.355036393965
                 }
             },*/
-            {
+            /*{
                 url: 'https://ruuth.xyz/test/Njiellalanjavri-Toskaljarvi-dolomite2.png',
                 bounds: {
                     north: 69.239886813021+gtk_adjust, south: 69.184494218998-gtk_adjust,
                     east: 21.54837565205, west: 21.355036393965
                 }
-            }
+            }*/
         ];
 
         console.log('*** body ***');
@@ -1365,7 +1368,7 @@
 
             // Select opentopomap a, b or c site
             settingsDiv.appendChild(document.createElement("BR"));
-            settingsDiv.appendChild(document.createTextNode('OpenTopoMap'));
+            settingsDiv.appendChild(document.createTextNode('OpenTopoMap and OpenStreetMap site'));
             settingsDiv.appendChild(document.createElement("BR"));
             var opentopomap_a = document.createElement("INPUT");
             opentopomap_a.setAttribute("type", "radio");
@@ -1471,7 +1474,7 @@
                     'maps=name[,name...]<br>' +
                     '</p> ' +
                     '<p>Url can have multiple kml and marker parameters.<br>' +
-                    'Possible maps are peruskartta, ortokuvat, opentopomap and mapant.'
+                    'Possible maps are peruskartta, ortokuvat, opentopomap, openstreetmap and mapant.'
                 '</p>' +
                     '</div>' +
                     '</div>';
@@ -1509,6 +1512,8 @@
                     '</p><p>' +
                     'OpenTopoMap data: © OpenStreetMap contributors, SRTM | map style: © OpenTopoMap (CC-BY-SA)' +
                     '</p><p>' +
+                    'OpenStreetMap data: © OpenStreetMap contributors' +
+                    '</p><p>' +
                     'Maps for Parenteesikartat layer are from book:<br>' +
                     'Pekka Silvast, 1991. Porkkala 1944–1956 - Neuvostoliiton merisotilaallinen tukikohta. Tutkimusraportti, Sotamuseo 1/1991.' +
                     '</p></p> ' +
@@ -1530,7 +1535,9 @@
                     'Luolaseuran luolat data is from <a href=https://caving.fi/>Suomen luolaseura</a> and<br>' +
                     'from book <a href=https://www.salakirjat.net/product/242/suomen-luolat>Suomen luolat</a>.<br>' +
                     '</p></p> ' +
-                    'Lintornit from Google My Maps <a href=https://www.google.com/maps/d/u/0/viewer?mid=1V0G10JDy6RxPXmN_eyyFb-5MT0E&ll=65.09362197686224%2C25.329884500000027&z=6>Suomen vesi-, näkö- ja lintutornit</a>'
+                    'Lintornit from Google My Maps <a href=https://www.google.com/maps/d/u/0/viewer?mid=1V0G10JDy6RxPXmN_eyyFb-5MT0E&ll=65.09362197686224%2C25.329884500000027&z=6>Suomen vesi-, näkö- ja lintutornit</a>' +
+                    '</p></p> ' +
+                    'Njiellalanjavri-Toscal dolomites from <a href=https://gtkdata.gtk.fi/Maankamara/index.html>GTK Maankamara</a>'
                 '</p></p> ' +
                     '</div>' +
                     '</div>';
@@ -1619,6 +1626,23 @@
             });
 
             map.mapTypes.set('opentopo', opentopoMapType);
+
+            // ------------------------------------------------------------
+            // initMap: Open Street Map 
+
+            var openstreetMapType = new google.maps.ImageMapType({
+                getTileUrl: function (coord, zoom) {
+                    var url = "https://" + opentopomap_site + ".tile.openstreetmap.org/" + zoom + "/" + coord.x + "/" + coord.y + ".png";
+                    //console.log('OpenStreetMap url='+url);
+                    return url;
+                },
+                tileSize: new google.maps.Size(256, 256),
+                maxZoom: 17,
+                minZoom: 0,
+                name: 'OpenStreet'
+            });
+
+            map.mapTypes.set('openstreet', openstreetMapType);
 
             // ------------------------------------------------------------
             // initMap: MapAnt 
@@ -1799,7 +1823,7 @@
             function handleLocationError(browserHasGeolocation, infoWindow, pos) {
                 var msg = browserHasGeolocation ?
                     'Error: The Geolocation service failed.' :
-                    'Error: Your browser doesn\'t support geolocation.';
+                    'Error: Your browser does not support geolocation.';
                 console.log(msg);
                 infoPopup.close();
                 infoWindow.close();
@@ -1832,6 +1856,9 @@
                     showStreetViewControl = false;
                 } else if (map.getMapTypeId() == 'opentopomap') {
                     mapInfoTextDiv.innerHTML = 'OpenStreetMap, OpenTopoMap';
+                    showStreetViewControl = false;
+                } else if (map.getMapTypeId() == 'openstreetmap') {
+                    mapInfoTextDiv.innerHTML = 'OpenStreetMap';
                     showStreetViewControl = false;
                 } else {
                     mapInfoTextDiv.innerHTML = '';
