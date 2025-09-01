@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Clickable Cave Search Map (Editable Radius)</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; }
+    header { padding: 12px 16px; background: #f7f7f7; position: sticky; top: 0; z-index: 1000; }
+    #controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    #map { height: calc(100vh - 64px); width: 100%; }
+    input[type="number"] { width: 100px; padding: 6px 8px; }
+    small { color: #555; }
+  </style>
+</head>
+<body>
+  <header>
+    <div id="controls">
+      <div><strong>Click the map</strong> to find caves nearby.</div>
+      <label>
+        Radius (km):
+        <input id="radiusKm" type="number" min="0.1" step="0.1" value="10">
+      </label>
+      <small id="radiusNote">Searching within 10.0 km</small>
+    </div>
+  </header>
+
+  <div id="map"></div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+    // --- Config
+    const initialLat = 60.0;     // Finland-ish default
+    const initialLon = 25.0;
+    const MIN_RADIUS_M = 100;    // 100 m guard
+    const MAX_RADIUS_M = 100000; // 100 km guard
+
+    // --- Helpers
+    const radiusInput = document.getElementById('radiusKm');
+    const radiusNote  = document.getElementById('radiusNote');
+
+    function kmToMeters(km) {
+      const m = Number(km) * 1000;
+      if (Number.isNaN(m)) return 10000;
+      return Math.min(Math.max(m, MIN_RADIUS_M), MAX_RADIUS_M);
+    }
+
+    function getRadiusMeters() {
+      return kmToMeters(radiusInput.value);
+    }
+
+    function updateRadiusNote() {
+      const km = Math.round((getRadiusMeters() / 1000) * 10) / 10;
+      radiusNote.textContent = `Searching within ${km.toFixed(1)} km`;
+    }
+
+    // --- Map init
+    const map = L.map('map').setView([initialLat, initialLon], 7);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 18,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    let circleLayer = null;
+    const markerGroup = L.layerGroup().addTo(map);
+    let lastClickLatLng = null;
+
+    // --- Query & render
+    async function findCavesNear(lat, lon, radiusMeters) {
+      // Draw/refresh the search circle
+      if (circleLayer) map.removeLayer(circleLayer);
+      circleLayer = L.circle([lat, lon], {
+        radius: radiusMeters,
+        color: 'blue',
+        fillOpacity: 0.08
+      }).addTo(map);
+
+      // Overpass QL query
+      const query = `
+        [out:json][timeout:25];
+        (
+          node["natural"="cave_entrance"](around:${radiusMeters},${lat},${lon});
+          way["natural"="cave_entrance"](around:${radiusMeters},${lat},${lon});
+          relation["natural"="cave_entrance"](around:${radiusMeters},${lat},${lon});
+        );
+        out center tags;
+      `;
+
+      try {
+        const res = await fetch('https://overpass-api.de/api/interpreter', {
+          method: 'POST',
+          body: query
+        });
+        const data = await res.json();
+
+        markerGroup.clearLayers();
+
+        if (!data.elements || data.elements.length === 0) {
+          // Optional: toast/alert is noisy—keep quiet if preferred
+          return;
+        }
+
+        data.elements.forEach(el => {
+          const pt = el.center || el; // ways/relations use .center
+          if (!pt?.lat || !pt?.lon) return;
+
+          const tags = el.tags || {};
+          const name = tags.name || 'Unnamed cave';
+
+          // Show all available tags in a compact list
+          let tagDetails = Object.entries(tags)
+            .sort(([a],[b]) => a.localeCompare(b))
+            .map(([k, v]) => `<b>${k}</b>: ${String(v)}`)
+            .join('<br>');
+          if (!tagDetails) tagDetails = '<i>No additional details</i>';
+
+          const osmLink = `https://www.openstreetmap.org/${el.type}/${el.id}`;
+          const popupContent = `
+            <div style="min-width:220px">
+              <div style="font-weight:600">${name}</div>
+              <div>Type: ${el.type}</div>
+              <hr>
+              ${tagDetails}
+              <hr>
+              <a href="${osmLink}" target="_blank" rel="noopener noreferrer">View on OSM</a>
+            </div>
+          `;
+
+          L.marker([pt.lat, pt.lon]).bindPopup(popupContent).addTo(markerGroup);
+        });
+      } catch (err) {
+        console.error('Overpass error:', err);
+        // Optional: show a friendly message
+      }
+    }
+
+    // --- Map click handler
+    map.on('click', (e) => {
+      lastClickLatLng = e.latlng;
+      updateRadiusNote();
+      findCavesNear(lastClickLatLng.lat, lastClickLatLng.lng, getRadiusMeters());
+    });
+
+    // --- React to radius changes
+    function onRadiusChange() {
+      updateRadiusNote();
+      if (lastClickLatLng) {
+        // Re-run the last search with the new radius
+        findCavesNear(lastClickLatLng.lat, lastClickLatLng.lng, getRadiusMeters());
+      } else if (circleLayer) {
+        // If no search yet but circle exists, just update its radius
+        circleLayer.setRadius(getRadiusMeters());
+      }
+    }
+
+    // Update as user types and on commit
+    radiusInput.addEventListener('input', onRadiusChange);
+    radiusInput.addEventListener('change', onRadiusChange);
+
+    // Init label
+    updateRadiusNote();
+  </script>
+</body>
+</html>

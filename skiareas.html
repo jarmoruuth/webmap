@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Clickable Ski Lifts (Endpoints, Stations, Retry, Permalink, Ele filter)</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; }
+    header { padding: 12px 16px; background: #f7f7f7; position: sticky; top: 0; z-index: 1000; }
+    #controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    #map { height: calc(100vh - 88px); width: 100%; }
+    input[type="number"] { width: 110px; padding: 6px 8px; }
+    small { color: #555; }
+    .legend { display:flex; gap:10px; align-items:center; }
+    .key { display:inline-flex; align-items:center; gap:6px; }
+    .dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
+    .pill { background:#fff; border:1px solid #ddd; border-radius:999px; padding:3px 10px; display:inline-flex; align-items:center; gap:6px; }
+    button { padding:6px 10px; border:1px solid #ddd; background:#fff; border-radius:8px; cursor:pointer; }
+    button:active { transform: translateY(1px); }
+
+    /* Loading overlay */
+    #loading {
+      position: fixed; inset: 0;
+      background: rgba(255,255,255,0.7);
+      display: none; align-items: center; justify-content: center;
+      z-index: 2000;
+    }
+    #loading .box {
+      display:flex; flex-direction: column; align-items:center; gap:10px;
+      background:#fff; border:1px solid #ddd; border-radius:12px; padding:16px 20px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+    }
+    .spinner {
+      width: 28px; height: 28px;
+      border: 3px solid #ddd;
+      border-top-color: #888;
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <header>
+    <div id="controls">
+      <div><strong>Click the map</strong> to find ski lifts nearby.</div>
+
+      <label>
+        Radius (km):
+        <input id="radiusKm" type="number" min="0.1" step="0.1" value="10">
+      </label>
+      <small id="radiusNote">Searching within 10.0 km</small>
+
+      <label class="pill" title="Filter by top elevation derived from ele tags on the lift or its endpoints">
+        Min top elevation (m):
+        <input id="minEle" type="number" min="0" step="50" value="0">
+      </label>
+      <small id="eleNote">No elevation filter</small>
+
+      <label class="pill" title="Also show OSM nodes tagged aerialway=station (honors elevation filter)">
+        <input id="toggleStations" type="checkbox">
+        Include station nodes
+      </label>
+
+      <button id="shareBtn" title="Copy a link to this view & settings">Share link</button>
+
+      <div class="legend">
+        <span class="key"><span class="dot" style="background:#d62728"></span>Gondola / Cable car</span>
+        <span class="key"><span class="dot" style="background:#1f77b4"></span>Chair / Drag / Tow</span>
+        <span class="key"><span class="dot" style="background:#9467bd"></span>Other aerialway</span>
+        <span class="key"><span class="dot" style="background:#ff7f0e"></span>Station node</span>
+      </div>
+    </div>
+  </header>
+
+  <div id="map"></div>
+
+  <!-- Loading overlay -->
+  <div id="loading" aria-live="polite">
+    <div class="box">
+      <div class="spinner" aria-hidden="true"></div>
+      <div>Loading…</div>
+    </div>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+    // --- Config
+    // Default center: Zermatt, Switzerland
+    const initialLat = 46.0207;
+    const initialLon = 7.7491;
+    const initialZoom = 12;
+
+    const MIN_RADIUS_M = 100;    // 100 m guard
+    const MAX_RADIUS_M = 100000; // 100 km guard
+
+    // Overpass endpoints (primary -> fallbacks)
+    const OVERPASS_ENDPOINTS = [
+      'https://overpass-api.de/api/interpreter',
+      'https://overpass.kumi.systems/api/interpreter',
+      'https://overpass.openstreetmap.fr/api/interpreter'
+    ];
+    const OVERPASS_TIMEOUT_MS = 25000;
+
+    // --- Helpers
+    const radiusInput   = document.getElementById('radiusKm');
+    const radiusNote    = document.getElementById('radiusNote');
+    const minEleInput   = document.getElementById('minEle');
+    const eleNote       = document.getElementById('eleNote');
+    const stationsInput = document.getElementById('toggleStations');
+    const shareBtn      = document.getElementById('shareBtn');
+    const loadingEl     = document.getElementById('loading');
+
+    function showLoading(on) { loadingEl.style.display = on ? 'flex' : 'none'; }
+
+    function kmToMeters(km) {
+      const m = Number(km) * 1000;
+      if (Number.isNaN(m)) return 10000;
+      return Math.min(Math.max(m, MIN_RADIUS_M), MAX_RADIUS_M);
+    }
+    function getRadiusMeters() { return kmToMeters(radiusInput.value); }
+    function updateRadiusNote() {
+      const km = Math.round((getRadiusMeters() / 1000) * 10) / 10;
+      radiusNote.textContent = `Searching within ${km.toFixed(1)} km`;
+    }
+
+    function getMinEleMeters() {
+      const v = Number(minEleInput.value);
+      return Number.isFinite(v) ? Math.max(0, v) : 0;
+    }
+    function updateEleNote() {
+      const m = getMinEleMeters();
+      eleNote.textContent = m > 0 ? `Showing features with top ele ≥ ${m} m` : 'No elevation filter';
+    }
+
+    // Robust ele parser (handles "3160", "3160 m", "3,160", etc.)
+    function parseEle(ele) {
+      if (ele == null) return null;
+      const s = String(ele).trim().replace(',', '.');
+      const m = s.match(/-?\d+(?:\.\d+)?/);
+      return m ? parseFloat(m[0]) : null;
+    }
+
+    // --- Map init
+    const map = L.map('map').setView([initialLat, initialLon], initialZoom);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    let circleLayer = null;
+    const lineLayer   = L.layerGroup().addTo(map); // polylines
+    const markerLayer = L.layerGroup().addTo(map); // endpoints + stations (no clustering)
+    let lastClickLatLng = null;
+
+    // --- Colors by lift kind
+    function liftColor(tags){
+      const t = (tags.aerialway || '').toLowerCase();
+      if (t === 'gondola' || t === 'cable_car' || t === 'mixed_lift') return '#d62728';
+      if (t.includes('chair') || t.includes('drag') || t.includes('t-bar') || t.includes('j-bar') ||
+          t === 'platter' || t === 'rope_tow' || t === 'magic_carpet') return '#1f77b4';
+      return '#9467bd';
+    }
+
+    // --- Overpass fetch with retry & timeout
+    async function fetchOverpass(query) {
+      let lastErr = null;
+      for (const url of OVERPASS_ENDPOINTS) {
+        try {
+          const ctrl = new AbortController();
+          const t = setTimeout(() => ctrl.abort(), OVERPASS_TIMEOUT_MS);
+          const res = await fetch(url, { method: 'POST', body: query, signal: ctrl.signal });
+          clearTimeout(t);
+          if (!res.ok) { lastErr = new Error(url + ' HTTP ' + res.status); continue; }
+          return await res.json();
+        } catch (e) {
+          lastErr = e;
+          await new Promise(r => setTimeout(r, 300)); // brief backoff
+        }
+      }
+      throw lastErr || new Error('All Overpass endpoints failed');
+    }
+
+    // --- URL state (permalink)
+    function readStateFromURL() {
+      const h = new URLSearchParams(location.hash.replace(/^#/, ''));
+      const lat = parseFloat(h.get('lat'));
+      const lon = parseFloat(h.get('lon'));
+      const z   = parseFloat(h.get('z'));
+      const rkm = parseFloat(h.get('rkm'));
+      const st  = h.get('st') === '1';
+      const q   = h.get('q') === '1';
+      const em  = parseFloat(h.get('emin'));
+      const state = {};
+      if (!Number.isNaN(lat) && !Number.isNaN(lon)) state.center = [lat, lon];
+      if (!Number.isNaN(z))   state.zoom = z;
+      if (!Number.isNaN(rkm)) state.radiusKm = rkm;
+      if (!Number.isNaN(em))  state.minEle = em;
+      state.stations = st;
+      state.autoQuery = q;
+      return state;
+    }
+    function writeStateToURL() {
+      const c = map.getCenter();
+      const z = map.getZoom();
+      const params = new URLSearchParams(location.hash.replace(/^#/, ''));
+      params.set('lat', c.lat.toFixed(6));
+      params.set('lon', c.lng.toFixed(6));
+      params.set('z', String(z));
+      params.set('rkm', (getRadiusMeters()/1000).toFixed(2));
+      params.set('emin', String(getMinEleMeters()));
+      params.set('st', stationsInput.checked ? '1' : '0');
+      params.set('q', '1'); // ensure opening the link will auto-run a query
+      const newHash = '#' + params.toString();
+      if (location.hash !== newHash) history.replaceState(null, '', newHash);
+    }
+
+    // Copy permalink to clipboard
+    shareBtn.addEventListener('click', async () => {
+      writeStateToURL();
+      try {
+        await navigator.clipboard.writeText(location.href);
+        shareBtn.textContent = 'Link copied!';
+        setTimeout(() => shareBtn.textContent = 'Share link', 1200);
+      } catch {
+        prompt('Copy this link:', location.href);
+      }
+    });
+
+    // Update permalink on view/controls change
+    map.on('moveend', writeStateToURL);
+
+    // --- Query & render (lifts + optional station nodes, elevation filter via ele tags)
+    async function findLiftsNear(lat, lon, radiusMeters) {
+      // Draw/refresh the search circle
+      if (circleLayer) map.removeLayer(circleLayer);
+      circleLayer = L.circle([lat, lon], {
+        radius: radiusMeters, color: 'blue', fillOpacity: 0.08
+      }).addTo(map);
+
+      const stationsQL = stationsInput.checked
+        ? `node["aerialway"="station"](around:${radiusMeters},${lat},${lon});`
+        : ``;
+
+      const query = `
+        [out:json][timeout:25];
+        (
+          way["aerialway"]["aerialway"!~"^(pylon|station)$"](around:${radiusMeters},${lat},${lon});
+          ${stationsQL}
+        );
+        out body geom;
+        >;
+        out body;
+      `;
+
+      showLoading(true);
+      try {
+        const data = await fetchOverpass(query);
+
+        // reset layers
+        lineLayer.clearLayers();
+        markerLayer.clearLayers();
+
+        if (!data.elements || data.elements.length === 0) return;
+
+        // Build maps
+        const nodesById = new Map();
+        const ways = [];
+        for (const el of data.elements) {
+          if (el.type === 'node') nodesById.set(el.id, el);
+          else if (el.type === 'way') ways.push(el);
+        }
+
+        function htmlTags(tags) {
+          const entries = Object.entries(tags || {}).sort(([a],[b]) => a.localeCompare(b));
+          if (!entries.length) return '<i>No additional details</i>';
+          return entries.map(([k,v]) => `<b>${k}</b>: ${String(v)}`).join('<br>');
+        }
+
+        const minEle = getMinEleMeters();
+
+        // Render ways (lifts), plus clickable endpoints
+        ways.forEach(w => {
+          const tags = w.tags || {};
+          const coords = (w.geometry || []).map(p => [p.lat, p.lon]);
+          if (coords.length < 2) return;
+
+          // --- Elevation filtering for lifts
+          // Gather candidate elevations: way.ele, way['ele:to'], way['ele:from'], endpoint node 'ele'
+          const candidates = [];
+          const wayEle = parseEle(tags.ele);
+          const wayEleTo = parseEle(tags['ele:to']);
+          const wayEleFrom = parseEle(tags['ele:from']);
+          if (wayEle != null) candidates.push(wayEle);
+          if (wayEleTo != null) candidates.push(wayEleTo);
+          if (wayEleFrom != null) candidates.push(wayEleFrom);
+
+          let ndStart = null, ndEnd = null;
+          if (Array.isArray(w.nodes) && w.nodes.length >= 2) {
+            ndStart = nodesById.get(w.nodes[0]) || null;
+            ndEnd   = nodesById.get(w.nodes[w.nodes.length - 1]) || null;
+            const e1 = parseEle(ndStart?.tags?.ele);
+            const e2 = parseEle(ndEnd?.tags?.ele);
+            if (e1 != null) candidates.push(e1);
+            if (e2 != null) candidates.push(e2);
+          }
+
+          const topEle = candidates.length ? Math.max(...candidates) : null;
+          if (minEle > 0) {
+            // If no ele found anywhere OR top < threshold => skip the whole lift
+            if (topEle == null || topEle < minEle) return;
+          }
+
+          const color = liftColor(tags);
+          const name = tags.name || `Lift: ${tags.aerialway || 'unknown'}`;
+          const osmWay = `https://www.openstreetmap.org/way/${w.id}`;
+
+          const wayPopup = `
+            <div style="min-width:260px">
+              <div style="font-weight:600">${name}</div>
+              <div>Aerialway: <b>${tags.aerialway || 'unknown'}</b></div>
+              ${topEle != null ? `<div><b>Top ele</b>: ${Math.round(topEle)} m</div>` : ``}
+              <hr>
+              ${htmlTags(tags)}
+              <hr>
+              <a href="${osmWay}" target="_blank" rel="noopener noreferrer">View lift on OSM</a>
+            </div>
+          `;
+
+          // Draw polyline
+          L.polyline(coords, { color, weight: 3, opacity: 0.9 })
+            .addTo(lineLayer)
+            .bindPopup(wayPopup);
+
+          // Midpoint marker (for easy clicking)
+          const mid = coords[Math.floor(coords.length / 2)];
+          L.circleMarker(mid, { radius: 5, color, weight: 2, fillOpacity: 0.7 })
+            .addTo(markerLayer)
+            .bindPopup(wayPopup);
+
+          // Endpoint nodes (clickable; show node tags like ele if present)
+          if (Array.isArray(w.nodes) && w.nodes.length >= 2) {
+            const epIds = [w.nodes[0], w.nodes[w.nodes.length - 1]];
+            epIds.forEach((nid, idx) => {
+              const nd = nodesById.get(nid);
+              let latlng, nodePopup;
+
+              if (nd) {
+                const ndEle = parseEle(nd.tags?.ele);
+                // If filtering by ele, only show endpoint marker if it has an ele and meets threshold
+                if (minEle > 0 && (ndEle == null || ndEle < minEle)) return;
+
+                latlng = [nd.lat, nd.lon];
+                const nodeName = nd.tags?.name || (nd.tags?.aerialway ? `Node: ${nd.tags.aerialway}` : (idx === 0 ? 'Lift start' : 'Lift end'));
+                const eleHtml = ndEle != null ? `<div><b>Elevation</b>: ${ndEle} m</div>` : '';
+                const osmNode = `https://www.openstreetmap.org/node/${nd.id}`;
+                nodePopup = `
+                  <div style="min-width:240px">
+                    <div style="font-weight:600">${nodeName}</div>
+                    ${eleHtml}
+                    <hr>
+                    ${htmlTags(nd.tags || {})}
+                    <hr>
+                    <a href="${osmNode}" target="_blank" rel="noopener noreferrer">View node on OSM</a>
+                  </div>
+                `;
+              } else {
+                // No node data; only place endpoint marker when not filtering (since no ele available)
+                if (minEle > 0) return;
+                const pt = (idx === 0) ? coords[0] : coords[coords.length - 1];
+                latlng = pt;
+                nodePopup = `
+                  <div style="min-width:220px">
+                    <div style="font-weight:600">${idx === 0 ? 'Lift start' : 'Lift end'}</div>
+                    <div>No node tags available</div>
+                  </div>
+                `;
+              }
+
+              L.circleMarker(latlng, { radius: 5, color, weight: 2, fillOpacity: 0.7 })
+                .addTo(markerLayer)
+                .bindPopup(nodePopup);
+            });
+          }
+        });
+
+        // Standalone station nodes (optional, honors ele filter)
+        if (stationsInput.checked) {
+          for (const el of data.elements) {
+            if (el.type === 'node' && el.tags && el.tags.aerialway === 'station') {
+              const ele = parseEle(el.tags.ele);
+              if (getMinEleMeters() > 0) {
+                if (ele == null || ele < getMinEleMeters()) continue; // skip if no/low ele
+              }
+              const tags = el.tags;
+              const name = tags.name || 'Ski station';
+              const osm = `https://www.openstreetmap.org/node/${el.id}`;
+              const popup = `
+                <div style="min-width:240px">
+                  <div style="font-weight:600">${name}</div>
+                  <div>Type: <b>${tags.aerialway}</b></div>
+                  ${ele != null ? `<div><b>Elevation</b>: ${Math.round(ele)} m</div>` : ``}
+                  <hr>
+                  ${htmlTags(tags)}
+                  <hr>
+                  <a href="${osm}" target="_blank" rel="noopener noreferrer">View station on OSM</a>
+                </div>
+              `;
+              L.circleMarker([el.lat, el.lon], {
+                radius: 6, color: '#ff7f0e', weight: 2, fillOpacity: 0.75
+              }).addTo(markerLayer).bindPopup(popup);
+            }
+          }
+        }
+
+        // Fit to results
+        const bounds = L.latLngBounds([]);
+        lineLayer.eachLayer(l => { try { bounds.extend(l.getBounds()); } catch {} });
+        markerLayer.eachLayer(l => { try { bounds.extend(l.getLatLng()); } catch {} });
+        if (bounds.isValid()) map.fitBounds(bounds.pad(0.12));
+
+      } catch (err) {
+        console.error('Overpass error:', err);
+        alert('Fetching lifts failed. Please try again (the Overpass servers might be busy).');
+      } finally {
+        showLoading(false);
+      }
+    }
+
+    // --- Map click handler
+    map.on('click', (e) => {
+      lastClickLatLng = e.latlng;
+      updateRadiusNote();
+      updateEleNote();
+      writeStateToURL();
+      findLiftsNear(lastClickLatLng.lat, lastClickLatLng.lng, getRadiusMeters());
+    });
+
+    // --- React to control/view changes
+    function refreshIfReady() {
+      updateRadiusNote();
+      updateEleNote();
+      writeStateToURL();
+      if (lastClickLatLng) {
+        findLiftsNear(lastClickLatLng.lat, lastClickLatLng.lng, getRadiusMeters());
+      } else if (circleLayer) {
+        circleLayer.setRadius(getRadiusMeters());
+      }
+    }
+    radiusInput.addEventListener('input', refreshIfReady);
+    radiusInput.addEventListener('change', refreshIfReady);
+    minEleInput.addEventListener('input', refreshIfReady);
+    minEleInput.addEventListener('change', refreshIfReady);
+    stationsInput.addEventListener('change', refreshIfReady);
+
+    // Init labels
+    updateRadiusNote();
+    updateEleNote();
+
+    // Restore from permalink (if present) and optionally auto-query
+    (function initFromURL(){
+      const st = readStateFromURL();
+      if (st.radiusKm) radiusInput.value = st.radiusKm;
+      if (typeof st.minEle === 'number' && !Number.isNaN(st.minEle)) minEleInput.value = st.minEle;
+      if (typeof st.stations === 'boolean') stationsInput.checked = st.stations;
+      updateRadiusNote();
+      updateEleNote();
+
+      if (st.center) {
+        map.setView(st.center, st.zoom || initialZoom);
+      } else {
+        map.setView([initialLat, initialLon], initialZoom);
+      }
+
+      if (st.center && st.autoQuery) {
+        lastClickLatLng = L.latLng(st.center[0], st.center[1]);
+        findLiftsNear(lastClickLatLng.lat, lastClickLatLng.lng, getRadiusMeters());
+      }
+    })();
+  </script>
+</body>
+</html>

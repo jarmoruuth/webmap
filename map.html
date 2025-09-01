@@ -36,7 +36,7 @@
         // failed.", it means you probably did not give permission for the browser to
         // locate you.
 
-        var version = "0.49";
+        var version = "0.50";
 
         var map;
         var id, infoWindow, infoPopup, marker, options;
@@ -1274,7 +1274,7 @@
             settingsDiv.appendChild(document.createElement("BR"));
             settingsDiv.appendChild(document.createElement("BR"));
 
-            // Create clikable link to start distance measure mode
+            // Create clickable link to start distance measure mode
             var measureDistanceButton = document.createElement("BUTTON");
             measureDistanceButton.appendChild(document.createTextNode("Measure distance"));
             measureDistanceButton.onclick = function () {
@@ -1286,6 +1286,27 @@
                 }
             };
             settingsDiv.appendChild(measureDistanceButton);
+
+            settingsDiv.appendChild(document.createElement("BR"));
+            settingsDiv.appendChild(document.createElement("BR"));
+
+            // Create clickable link to open nearbycavesmap.html page
+            var nearbyCavesButton = document.createElement("BUTTON");
+            nearbyCavesButton.appendChild(document.createTextNode("Nearby Caves Map"));
+            nearbyCavesButton.onclick = function () {
+                window.open("nearbycavesmap.html", "_blank");
+            };
+            settingsDiv.appendChild(nearbyCavesButton);
+
+            settingsDiv.appendChild(document.createElement("BR"));
+
+            // Create clickable link to open skiareas.html page
+            var skiAreasButton = document.createElement("BUTTON");
+            skiAreasButton.appendChild(document.createTextNode("Ski Areas Map"));
+            skiAreasButton.onclick = function () {
+                window.open("skiareas.html", "_blank");
+            };
+            settingsDiv.appendChild(skiAreasButton);
 
             settingsDiv.appendChild(document.createElement("BR"));
             settingsDiv.appendChild(document.createElement("BR"));
