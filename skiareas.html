@@ -66,6 +66,12 @@
         Include station nodes
       </label>
 
+      <!-- DEM: new toggle -->
+      <label class="pill" title="When a lift has no ele tags, estimate top elevation from terrain at its endpoints">
+        <input id="toggleDemFallback" type="checkbox" checked>
+        Use DEM fallback for top ele
+      </label>
+
       <button id="shareBtn" title="Copy a link to this view & settings">Share link</button>
 
       <div class="legend">
@@ -108,12 +114,18 @@
     ];
     const OVERPASS_TIMEOUT_MS = 25000;
 
+    // DEM: Elevation providers (no key)
+    const OPENELEVATION_URL = 'https://api.open-elevation.com/api/v1/lookup';
+    const OPENTOPODATA_URL  = 'https://api.opentopodata.org/v1/srtm90m';
+    const DEM_BATCH_SIZE = 80;
+
     // --- Helpers
     const radiusInput   = document.getElementById('radiusKm');
     const radiusNote    = document.getElementById('radiusNote');
     const minEleInput   = document.getElementById('minEle');
     const eleNote       = document.getElementById('eleNote');
     const stationsInput = document.getElementById('toggleStations');
+    const demFallback   = document.getElementById('toggleDemFallback');
     const shareBtn      = document.getElementById('shareBtn');
     const loadingEl     = document.getElementById('loading');
 
@@ -145,6 +157,56 @@
       const s = String(ele).trim().replace(',', '.');
       const m = s.match(/-?\d+(?:\.\d+)?/);
       return m ? parseFloat(m[0]) : null;
+    }
+
+    // DEM: tiny cache so we don't look up the same point twice
+    const demCache = new Map(); // key "lat,lon" rounded
+    const roundKey = (lat, lon) => `${lat.toFixed(5)},${lon.toFixed(5)}`;
+
+    async function fetchDEM(points) {
+      // points: [{lat, lon}]
+      const unknown = [];
+      for (const p of points) {
+        const k = roundKey(p.lat, p.lon);
+        if (!demCache.has(k)) unknown.push(p);
+      }
+      if (!unknown.length) return;
+
+      // helper: Open-Elevation POST
+      async function queryOpenElevation(batch) {
+        const body = { locations: batch.map(p => ({ latitude: p.lat, longitude: p.lon })) };
+        const res = await fetch(OPENELEVATION_URL, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+        });
+        if (!res.ok) throw new Error('Open-Elevation HTTP ' + res.status);
+        const json = await res.json();
+        (json.results || []).forEach((r, i) => {
+          const k = roundKey(batch[i].lat, batch[i].lon);
+          if (typeof r.elevation === 'number') demCache.set(k, r.elevation);
+        });
+      }
+
+      // helper: OpenTopoData GET fallback
+      async function queryOpenTopoData(batch) {
+        const locStr = batch.map(p => `${p.lat},${p.lon}`).join('|');
+        const res = await fetch(`${OPENTOPODATA_URL}?locations=${encodeURIComponent(locStr)}`);
+        if (!res.ok) throw new Error('OpenTopoData HTTP ' + res.status);
+        const json = await res.json();
+        (json.results || []).forEach((r, i) => {
+          const k = roundKey(batch[i].lat, batch[i].lon);
+          if (typeof r.elevation === 'number') demCache.set(k, r.elevation);
+        });
+      }
+
+      for (let i = 0; i < unknown.length; i += DEM_BATCH_SIZE) {
+        const batch = unknown.slice(i, i + DEM_BATCH_SIZE);
+        try {
+          await queryOpenElevation(batch);
+        } catch (e1) {
+          try { await queryOpenTopoData(batch); }
+          catch (e2) { /* ignore; we'll just miss DEM for this batch */ }
+        }
+      }
     }
 
     // --- Map init
@@ -196,6 +258,7 @@
       const st  = h.get('st') === '1';
       const q   = h.get('q') === '1';
       const em  = parseFloat(h.get('emin'));
+      const dem = h.get('dem') === '1';
       const state = {};
       if (!Number.isNaN(lat) && !Number.isNaN(lon)) state.center = [lat, lon];
       if (!Number.isNaN(z))   state.zoom = z;
@@ -203,6 +266,7 @@
       if (!Number.isNaN(em))  state.minEle = em;
       state.stations = st;
       state.autoQuery = q;
+      state.dem = dem;
       return state;
     }
     function writeStateToURL() {
@@ -215,6 +279,7 @@
       params.set('rkm', (getRadiusMeters()/1000).toFixed(2));
       params.set('emin', String(getMinEleMeters()));
       params.set('st', stationsInput.checked ? '1' : '0');
+      params.set('dem', demFallback.checked ? '1' : '0');
       params.set('q', '1'); // ensure opening the link will auto-run a query
       const newHash = '#' + params.toString();
       if (location.hash !== newHash) history.replaceState(null, '', newHash);
@@ -235,7 +300,7 @@
     // Update permalink on view/controls change
     map.on('moveend', writeStateToURL);
 
-    // --- Query & render (lifts + optional station nodes, elevation filter via ele tags)
+    // --- Query & render (lifts + optional station nodes, elevation filter incl. DEM fallback)
     async function findLiftsNear(lat, lon, radiusMeters) {
       // Draw/refresh the search circle
       if (circleLayer) map.removeLayer(circleLayer);
@@ -284,47 +349,100 @@
 
         const minEle = getMinEleMeters();
 
-        // Render ways (lifts), plus clickable endpoints
-        ways.forEach(w => {
+        // 1) Pre-scan lifts, compute tag-based topEle and collect DEM points when needed
+        const liftInfo = [];
+        const demPoints = []; // {lat, lon}
+        for (const w of ways) {
           const tags = w.tags || {};
           const coords = (w.geometry || []).map(p => [p.lat, p.lon]);
-          if (coords.length < 2) return;
-
-          // --- Elevation filtering for lifts
-          // Gather candidate elevations: way.ele, way['ele:to'], way['ele:from'], endpoint node 'ele'
-          const candidates = [];
-          const wayEle = parseEle(tags.ele);
-          const wayEleTo = parseEle(tags['ele:to']);
-          const wayEleFrom = parseEle(tags['ele:from']);
-          if (wayEle != null) candidates.push(wayEle);
-          if (wayEleTo != null) candidates.push(wayEleTo);
-          if (wayEleFrom != null) candidates.push(wayEleFrom);
+          if (coords.length < 2) continue;
 
           let ndStart = null, ndEnd = null;
           if (Array.isArray(w.nodes) && w.nodes.length >= 2) {
             ndStart = nodesById.get(w.nodes[0]) || null;
             ndEnd   = nodesById.get(w.nodes[w.nodes.length - 1]) || null;
-            const e1 = parseEle(ndStart?.tags?.ele);
-            const e2 = parseEle(ndEnd?.tags?.ele);
-            if (e1 != null) candidates.push(e1);
-            if (e2 != null) candidates.push(e2);
           }
 
-          const topEle = candidates.length ? Math.max(...candidates) : null;
-          if (minEle > 0) {
-            // If no ele found anywhere OR top < threshold => skip the whole lift
-            if (topEle == null || topEle < minEle) return;
+          const cands = [];
+          const wayEle    = parseEle(tags.ele);
+          const wayEleTo  = parseEle(tags['ele:to']);
+          const wayEleFrom= parseEle(tags['ele:from']);
+          if (wayEle    != null) cands.push(wayEle);
+          if (wayEleTo  != null) cands.push(wayEleTo);
+          if (wayEleFrom!= null) cands.push(wayEleFrom);
+
+          const ndStartEle = parseEle(ndStart?.tags?.ele);
+          const ndEndEle   = parseEle(ndEnd?.tags?.ele);
+          if (ndStartEle != null) cands.push(ndStartEle);
+          if (ndEndEle   != null) cands.push(ndEndEle);
+
+          const topEleTagged = cands.length ? Math.max(...cands) : null;
+
+          // Collect DEM endpoints if needed and available
+          let startLatLon = null, endLatLon = null;
+          if (demFallback.checked && topEleTagged == null) {
+            if (ndStart) startLatLon = { lat: ndStart.lat, lon: ndStart.lon };
+            else startLatLon = { lat: coords[0][0], lon: coords[0][1] };
+            if (ndEnd)   endLatLon   = { lat: ndEnd.lat, lon: ndEnd.lon };
+            else endLatLon   = { lat: coords[coords.length-1][0], lon: coords[coords.length-1][1] };
+            demPoints.push(startLatLon, endLatLon);
           }
+
+          liftInfo.push({
+            w, tags, coords, ndStart, ndEnd,
+            topEleTagged,
+            startLatLon, endLatLon,
+            topEleFinal: null,  // filled later
+            source: null        // 'tags' | 'dem' | null
+          });
+        }
+
+        // 2) If requested, fetch DEM for all missing points (batched + cached)
+        if (demFallback.checked && demPoints.length) {
+          await fetchDEM(demPoints);
+        }
+
+        // 3) Decide final top elevation per lift (tags first, else DEM)
+        for (const Lf of liftInfo) {
+          if (Lf.topEleTagged != null) {
+            Lf.topEleFinal = Lf.topEleTagged;
+            Lf.source = 'tags';
+          } else if (Lf.startLatLon && Lf.endLatLon) {
+            const sKey = roundKey(Lf.startLatLon.lat, Lf.startLatLon.lon);
+            const eKey = roundKey(Lf.endLatLon.lat, Lf.endLatLon.lon);
+            const sElev = demCache.get(sKey);
+            const eElev = demCache.get(eKey);
+            if (typeof sElev === 'number' || typeof eElev === 'number') {
+              Lf.topEleFinal = Math.max(
+                typeof sElev === 'number' ? sElev : -Infinity,
+                typeof eElev === 'number' ? eElev : -Infinity
+              );
+              if (!Number.isFinite(Lf.topEleFinal)) Lf.topEleFinal = null;
+              else Lf.source = 'dem';
+            }
+          }
+        }
+
+        // 4) Render lifts (apply minEle AFTER final topEle decided)
+        for (const Lf of liftInfo) {
+          const { w, tags, coords, ndStart, ndEnd, topEleFinal, source } = Lf;
+          if (coords.length < 2) continue;
+
+          if (minEle > 0 && (topEleFinal == null || topEleFinal < minEle)) continue;
 
           const color = liftColor(tags);
           const name = tags.name || `Lift: ${tags.aerialway || 'unknown'}`;
           const osmWay = `https://www.openstreetmap.org/way/${w.id}`;
 
+          const topLine = (topEleFinal != null)
+            ? `<div><b>Top ele</b>: ${Math.round(topEleFinal)} m${source === 'dem' ? ' <i>(DEM)</i>' : ''}</div>`
+            : '';
+
           const wayPopup = `
             <div style="min-width:260px">
               <div style="font-weight:600">${name}</div>
               <div>Aerialway: <b>${tags.aerialway || 'unknown'}</b></div>
-              ${topEle != null ? `<div><b>Top ele</b>: ${Math.round(topEle)} m</div>` : ``}
+              ${topLine}
               <hr>
               ${htmlTags(tags)}
               <hr>
@@ -343,59 +461,66 @@
             .addTo(markerLayer)
             .bindPopup(wayPopup);
 
-          // Endpoint nodes (clickable; show node tags like ele if present)
-          if (Array.isArray(w.nodes) && w.nodes.length >= 2) {
-            const epIds = [w.nodes[0], w.nodes[w.nodes.length - 1]];
-            epIds.forEach((nid, idx) => {
-              const nd = nodesById.get(nid);
-              let latlng, nodePopup;
+          // Endpoint nodes (show tag ele OR DEM if tags missing & DEM used)
+          const endpoints = [
+            { nd: ndStart, fallbackLatLon: Lf.startLatLon, label: 'Lift start' },
+            { nd: ndEnd,   fallbackLatLon: Lf.endLatLon,   label: 'Lift end' }
+          ];
 
-              if (nd) {
-                const ndEle = parseEle(nd.tags?.ele);
-                // If filtering by ele, only show endpoint marker if it has an ele and meets threshold
-                if (minEle > 0 && (ndEle == null || ndEle < minEle)) return;
+          endpoints.forEach(({ nd, fallbackLatLon, label }) => {
+            let latlng = null;
+            let eleVal = parseEle(nd?.tags?.ele);
+            let eleFromDem = false;
 
-                latlng = [nd.lat, nd.lon];
-                const nodeName = nd.tags?.name || (nd.tags?.aerialway ? `Node: ${nd.tags.aerialway}` : (idx === 0 ? 'Lift start' : 'Lift end'));
-                const eleHtml = ndEle != null ? `<div><b>Elevation</b>: ${ndEle} m</div>` : '';
-                const osmNode = `https://www.openstreetmap.org/node/${nd.id}`;
-                nodePopup = `
-                  <div style="min-width:240px">
-                    <div style="font-weight:600">${nodeName}</div>
-                    ${eleHtml}
-                    <hr>
-                    ${htmlTags(nd.tags || {})}
-                    <hr>
-                    <a href="${osmNode}" target="_blank" rel="noopener noreferrer">View node on OSM</a>
-                  </div>
-                `;
-              } else {
-                // No node data; only place endpoint marker when not filtering (since no ele available)
-                if (minEle > 0) return;
-                const pt = (idx === 0) ? coords[0] : coords[coords.length - 1];
-                latlng = pt;
-                nodePopup = `
-                  <div style="min-width:220px">
-                    <div style="font-weight:600">${idx === 0 ? 'Lift start' : 'Lift end'}</div>
-                    <div>No node tags available</div>
-                  </div>
-                `;
+            if (nd) {
+              latlng = [nd.lat, nd.lon];
+            } else if (fallbackLatLon) {
+              latlng = [fallbackLatLon.lat, fallbackLatLon.lon];
+            }
+
+            if (latlng) {
+              if (eleVal == null && demFallback.checked && fallbackLatLon) {
+                const k = roundKey(fallbackLatLon.lat, fallbackLatLon.lon);
+                const dem = demCache.get(k);
+                if (typeof dem === 'number') { eleVal = dem; eleFromDem = true; }
               }
+
+              // Respect minEle filter for endpoints only if an elevation is known
+              if (getMinEleMeters() > 0 && eleVal != null && eleVal < getMinEleMeters()) return;
+
+              const nameNode = nd?.tags?.name || (nd?.tags?.aerialway ? `Node: ${nd.tags.aerialway}` : label);
+              const eleHtml = eleVal != null
+                ? `<div><b>Elevation</b>: ${Math.round(eleVal)} m${eleFromDem ? ' <i>(DEM)</i>' : ''}</div>`
+                : '';
+
+              const osmNode = nd ? `https://www.openstreetmap.org/node/${nd.id}` : null;
+              const tagsHtml = nd ? htmlTags(nd.tags || {}) : '<i>No additional details</i>';
+              const osmLink = osmNode ? `<hr><a href="${osmNode}" target="_blank" rel="noopener noreferrer">View node on OSM</a>` : '';
+
+              const nodePopup = `
+                <div style="min-width:240px">
+                  <div style="font-weight:600">${nameNode}</div>
+                  ${eleHtml}
+                  <hr>
+                  ${tagsHtml}
+                  ${osmLink}
+                </div>
+              `;
 
               L.circleMarker(latlng, { radius: 5, color, weight: 2, fillOpacity: 0.7 })
                 .addTo(markerLayer)
                 .bindPopup(nodePopup);
-            });
-          }
-        });
+            }
+          });
+        }
 
-        // Standalone station nodes (optional, honors ele filter)
+        // 5) Standalone station nodes (optional, honors ele filter; no DEM for stations)
         if (stationsInput.checked) {
           for (const el of data.elements) {
             if (el.type === 'node' && el.tags && el.tags.aerialway === 'station') {
               const ele = parseEle(el.tags.ele);
               if (getMinEleMeters() > 0) {
-                if (ele == null || ele < getMinEleMeters()) continue; // skip if no/low ele
+                if (ele == null || ele < getMinEleMeters()) continue;
               }
               const tags = el.tags;
               const name = tags.name || 'Ski station';
@@ -457,6 +582,7 @@
     minEleInput.addEventListener('input', refreshIfReady);
     minEleInput.addEventListener('change', refreshIfReady);
     stationsInput.addEventListener('change', refreshIfReady);
+    demFallback.addEventListener('change', refreshIfReady);
 
     // Init labels
     updateRadiusNote();
@@ -468,6 +594,7 @@
       if (st.radiusKm) radiusInput.value = st.radiusKm;
       if (typeof st.minEle === 'number' && !Number.isNaN(st.minEle)) minEleInput.value = st.minEle;
       if (typeof st.stations === 'boolean') stationsInput.checked = st.stations;
+      if (typeof st.dem === 'boolean') demFallback.checked = st.dem;
       updateRadiusNote();
       updateEleNote();
 
