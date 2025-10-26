@@ -41,7 +41,6 @@
         var map;
         var id, infoWindow, infoPopup, marker, options;
         var infoBottomWindow, infoBottomWindowPos;
-        var nbasemaps;
         var current_location = { lat: 60.2053791, lng: 24.6540694 };          // Espoo
         var autoMove = true;
         var path = [];                // path of last positions
@@ -62,7 +61,7 @@
         var kmlVersion = 6;
         var mapInfoTextDiv;
         var use_kapsi_maastokartat = false;
-        var use_kapsi_ortokuvat = true;
+        var use_kapsi_ortokuvat = false;
         var opentopomap_site = 'a';
         var measureDistanceMode = 0;
         var measureDistancePath = null;
@@ -158,19 +157,19 @@
         ];
         var maps = [
             {
-                name: 'maasto', altnames: ['peruskartta', 'maasto', 'maastokartta'], visible: true
+                name: 'maasto', altnames: ['peruskartta', 'maasto', 'maastokartta'], visible: true, layer: null
             },
             {
-                name: 'ilma', altnames: ['ortokuvat', 'ilma', 'ortoilmakuvat'], visible: true
+                name: 'ilma', altnames: ['ortokuvat', 'ilma', 'ortoilmakuvat'], visible: true, layer: null
             },
             {
-                name: 'opentopo', altnames: ['opentopomap', 'opentopo'], visible: true
+                name: 'opentopo', altnames: ['opentopomap', 'opentopo'], visible: true, layer: null
             },
             {
-                name: 'openstreet', altnames: ['openstreetpmap', 'openstreet'], visible: true
+                name: 'openstreet', altnames: ['openstreetpmap', 'openstreet'], visible: true, layer: null
             },
             {
-                name: 'mapant', altnames: ['MapAnt'], visible: false
+                name: 'mapant', altnames: ['MapAnt'], visible: false, layer: null
             }
         ];
         var overlayMaps = [
@@ -456,7 +455,7 @@
             if (sessionStorage.getItem('AutoMove')) {
                 autoMove = restoreBool('AutoMove');
                 if (centerMarker) {
-                    centerMarker.setVisible(!autoMove);
+                    centerMarker.element.style.display = autoMove ? 'none' : 'block';
                 }
                 console.log("restoreState:autoMove=" + autoMove);
             } else {
@@ -524,6 +523,22 @@
                     console.log('restoreState:could not restore Path');
                 }
             }
+        }
+
+        function mapIsVisible(name)
+        {
+            for (var j = 0; j < maps.length; j++) {
+                if (name == maps[j].name) {
+                    return maps[j].visible;
+                } else {
+                    for (let k = 0; k < maps[j].altnames.length; k++) {
+                        if (name == maps[j].altnames[k]) {
+                            return maps[j].visible;
+                        }
+                    }
+                }
+            }
+            return false;
         }
 
         function mapsSetVisible(visible_maps) {
@@ -709,15 +724,15 @@
                             console.log('loadMarkerJSON:invalid coordinates, data=', data);
                             continue;
                         }
-                        const marker = new google.maps.Marker({
-                            position: pos,
-                            map: map,
-                            title: data.name,
-                            info: infotxt,
+                        const marker = new google.maps.marker.AdvancedMarkerElement({
+                                                position: pos,
+                                                map: map,
+                                                title: data.name
                         });
-                        marker.addListener("click", () => {
-                            infoWindow.setContent(marker.info);
-                            infoWindow.open(map, marker);
+                        marker.info = infotxt;
+                        marker.addListener("gmp-click", () => {
+                        infoWindow.setContent(marker.info);
+                        infoWindow.open(map, marker);
                         });
                         markers.push(marker);
                     }
@@ -758,6 +773,16 @@
             }
         }
 
+        function getPin(color) {
+                const pin = new google.maps.marker.PinElement({
+                    background: color, // fill color
+                    borderColor: "#0b3d91", // outline
+                    glyphColor: "white",    // icon (text) color
+                    scale: 1.2              // optional size
+                    });
+            return pin.element;
+        }
+
         function loadActivityJSON(layer) {
             console.log('loadActivityJSON:start fetch');
             fetch(layer.url)
@@ -776,18 +801,17 @@
                             addRowActivityJSON("Kartta", js[i].properties.m, true) +
                             "</table>" +
                             "<br><a href=" + js[i].properties.rl[0].u + ">Lisätietoja</a>";
-                        const marker = new google.maps.Marker({
-                            position: { lat: js[i].geometry.coordinates[0], lng: js[i].geometry.coordinates[1] },
-                            map: map,
-                            title: js[i].properties.n,
-                            info: infotxt,
-                            icon: {
-                                url: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png"
-                            }
+
+                        const marker = new google.maps.marker.AdvancedMarkerElement({
+                                            position: { lat: js[i].geometry.coordinates[0], lng: js[i].geometry.coordinates[1] },
+                                            map: map,
+                                            title: js[i].properties.n,
+                                            pin: getPin("blue")
                         });
-                        marker.addListener("click", () => {
-                            infoWindow.setContent(marker.info);
-                            infoWindow.open(map, marker);
+                        marker.info = infotxt;
+                        marker.addListener("gmp-click", () => {
+                        infoWindow.setContent(marker.info);
+                        infoWindow.open(map, marker);
                         });
                         markers.push(marker);
                     }
@@ -1145,6 +1169,7 @@
             map = new google.maps.Map(document.getElementById('map'), {
                 center: start_location,
                 zoom: map_zoom,
+                /*
                 mapTypeId: start_maptypeid,
                 mapTypeControlOptions: {
                     mapTypeIds: [
@@ -1152,7 +1177,10 @@
                         google.maps.MapTypeId.SATELLITE,
                         google.maps.MapTypeId.HYBRID
                     ]
-                }
+                },
+                */
+                mapId: "XXX API_KEY XXX",
+                mapTypeControl: false,   // removes the default selector
             });
 
             // Geojson marker style
@@ -1164,21 +1192,17 @@
                 });
             });
 
-            nbasemaps = map.mapTypeControlOptions.mapTypeIds.length;
-            setVisibleMaps();
-
             function setVisibleMaps() {
-                var n = nbasemaps;
-                var current_nmaps = map.mapTypeControlOptions.mapTypeIds.length;
-                for (var i = 0; i < maps.length; i++) {
-                    if (maps[i].visible) {
-                        map.mapTypeControlOptions.mapTypeIds[n] = maps[i].name;
-                        n++;
-                    }
+                // Clear all current overlays
+                while (map.overlayMapTypes.getLength() > 0) {
+                    map.overlayMapTypes.pop();
                 }
-                // clear old names
-                for (var i = n; i < current_nmaps; i++) {
-                    map.mapTypeControlOptions.mapTypeIds[i] = null;
+
+                // Add only the ones marked visible
+                for (let i = 0; i < maps.length; i++) {
+                    if (maps[i].visible) {
+                        map.overlayMapTypes.push(maps[i].layer);
+                    }
                 }
             }
 
@@ -1199,14 +1223,12 @@
 
             for (var i = 0; i < url_markers.length; i++) {
                 console.log('show markes, pos=' + url_markers[i].pos + ',label=' + url_markers[i].label);
-                var marker = new google.maps.Marker({
+                var marker = new google.maps.AdvancedMarkerElement({
                     position: url_markers[i].pos,
                     map: map,
                     title: 'Url marker',
                     label: url_markers[i].label,
-                    icon: {
-                        url: "https://maps.google.com/mapfiles/ms/icons/yellow-dot.png"
-                    }
+                    content: getPin('yellow')
                 });
             }
 
@@ -1576,15 +1598,30 @@
             // ------------------------------------------------------------
             // initMap: Crosshair to show the map center
 
-            var crosshairShape = { coords: [0, 0, 0, 0], type: 'rect' };
-            centerMarker = new google.maps.Marker({
-                map: map,
-                // icon: 'https://www.daftlogic.com/images/cross-hairs.gif',
-                icon: 'cross-hairs.png',
-                shape: crosshairShape
+            // Create a small <img> or <div> to use as the crosshair
+            const crosshairImg = document.createElement('img');
+            crosshairImg.src = 'cross-hairs.png';      // your local or hosted image
+            crosshairImg.style.width = '32px';         // adjust to your image size
+            crosshairImg.style.height = '32px';
+            crosshairImg.style.position = 'absolute';
+            crosshairImg.style.transform = 'translate(-50%, -50%)'; // center it perfectly
+            crosshairImg.style.pointerEvents = 'none'; // make clicks pass through
+
+            // Create an AdvancedMarkerElement with that content
+            centerMarker = new google.maps.marker.AdvancedMarkerElement({
+                                    map: map,
+                                    position: map.getCenter(), // initial position
+                                    content: crosshairImg,
+                                    zIndex: 9999 // make sure it's above overlays
             });
-            centerMarker.bindTo('position', map, 'center');
-            centerMarker.setVisible(!autoMove);
+
+            // Keep it bound to map center
+            google.maps.event.addListener(map, 'center_changed', () => {
+                centerMarker.position = map.getCenter();
+            });
+
+            // Show/hide based on your autoMove flag
+            centerMarker.element.style.display = autoMove ? 'none' : 'block';
 
             // ------------------------------------------------------------
             // initMap: Peruskartta 
@@ -1608,7 +1645,8 @@
                 name: 'Maasto'
             });
 
-            map.mapTypes.set('maasto', perusMapType);
+            map.overlayMapTypes.push(perusMapType);
+            maps[0].layer = perusMapType;
 
             // ------------------------------------------------------------
             // initMap: Ortoilmakuvat
@@ -1618,12 +1656,12 @@
                     if (use_kapsi_ortokuvat) {
                         var url = "https://tiles.kartat.kapsi.fi/ortokuva/" + zoom + "/" +
                             coord.x + "/" + coord.y + ".png";
-                        //console.log('Ortokuvat url='+url);
+                        // console.log('Ortokuvat url='+url);
                         return url;
                     } else {
                         var url = "https://avoin-karttakuva.maanmittauslaitos.fi/avoin/wmts/1.0.0/ortokuva/default/WGS84_Pseudo-Mercator/" + zoom + "/" +
                             coord.y + "/" + coord.x + ".png?api-key=API_KEY";
-                        //console.log('Ortokuvat url='+url);
+                        // console.log('Ortokuvat url='+url);
                         return url;
                     }
                 },
@@ -1633,7 +1671,8 @@
                 name: 'Ilma'
             });
 
-            map.mapTypes.set('ilma', ortoMapType);
+            map.overlayMapTypes.push(ortoMapType);
+            maps[1].layer = ortoMapType;
 
             // ------------------------------------------------------------
             // initMap: Open Topo Map 
@@ -1650,7 +1689,9 @@
                 name: 'OpenTopo'
             });
 
-            map.mapTypes.set('opentopo', opentopoMapType);
+            // map.mapTypes.set('opentopo', opentopoMapType);
+            map.overlayMapTypes.push(opentopoMapType);
+            maps[2].layer = opentopoMapType;
 
             // ------------------------------------------------------------
             // initMap: Open Street Map 
@@ -1667,7 +1708,9 @@
                 name: 'OpenStreet'
             });
 
-            map.mapTypes.set('openstreet', openstreetMapType);
+            //map.mapTypes.set('openstreet', openstreetMapType);
+            map.overlayMapTypes.push(openstreetMapType);
+            maps[3].layer = openstreetMapType;
 
             // ------------------------------------------------------------
             // initMap: MapAnt 
@@ -1684,7 +1727,104 @@
                 name: 'MapAnt'
             });
 
-            map.mapTypes.set('mapant', mapantMapType);
+            // map.mapTypes.set('mapant', mapantMapType);
+            map.overlayMapTypes.push(mapantMapType);
+            maps[4].layer = mapantMapType;
+
+            setVisibleMaps();
+
+            // ------------------------------------------------------------
+            // Custom basemap toolbar
+            const mapSwitchDiv = document.createElement("div");
+            mapSwitchDiv.style.background = "white";
+            mapSwitchDiv.style.padding = "4px";
+            mapSwitchDiv.style.borderRadius = "6px";
+            mapSwitchDiv.style.boxShadow = "0 2px 6px rgba(0,0,0,.3)";
+            mapSwitchDiv.style.display = "flex";
+            mapSwitchDiv.style.gap = "4px";
+            mapSwitchDiv.style.alignItems = "center";
+            mapSwitchDiv.style.fontFamily = "sans-serif";
+
+            // Helper: show chosen layer
+            function showBase(name) {
+                // Clear all overlays
+                while (map.overlayMapTypes.getLength() > 0) {
+                     map.overlayMapTypes.pop();
+                }
+                let visible = mapIsVisible(name);
+
+                switch (name) {
+                    case "google":
+                        map.setMapTypeId(google.maps.MapTypeId.ROADMAP);
+                        break;
+                    case "satellite":
+                        map.setMapTypeId(google.maps.MapTypeId.SATELLITE);
+                        break;
+                    case "maasto":
+                        map.setMapTypeId(google.maps.MapTypeId.ROADMAP);
+                        if (visible) {
+                            map.overlayMapTypes.push(perusMapType);
+                        }
+                        break;
+                    case "ilma":
+                        map.setMapTypeId(google.maps.MapTypeId.ROADMAP);
+                        if (visible) {
+                            map.overlayMapTypes.push(ortoMapType);
+                        }
+                        break;
+                    case "opentopo":
+                        map.setMapTypeId(google.maps.MapTypeId.ROADMAP);
+                        if (visible) {
+                            map.overlayMapTypes.push(opentopoMapType);
+                        }
+                        break;
+                    case "openstreet":
+                        map.setMapTypeId(google.maps.MapTypeId.ROADMAP);
+                        if (visible) {
+                            map.overlayMapTypes.push(openstreetMapType);
+                        }
+                        break;
+                    case "mapant":
+                        map.setMapTypeId(google.maps.MapTypeId.ROADMAP);
+                        if (visible) {
+                            map.overlayMapTypes.push(mapantMapType);
+                        }
+                        break;
+                }
+
+                // Highlight selected button (optional)
+                for (const btn of mapSwitchDiv.querySelectorAll("button")) {
+                    btn.style.background = btn.dataset.name === name ? "#4285F4" : "white";
+                    btn.style.color = btn.dataset.name === name ? "white" : "black";
+                }
+            }
+
+            let visible_maps = [];
+
+            visible_maps.push({ name: "google", label: "Google" }); // always visible
+            visible_maps.push({ name: "satellite", label: "Sat" }); // always visible
+            if (mapIsVisible("maasto")) visible_maps.push({ name: "maasto", label: "Maasto" });
+            if (mapIsVisible("ilma")) visible_maps.push({ name: "ilma", label: "Ilma" });
+            if (mapIsVisible("opentopo")) visible_maps.push({ name: "opentopo", label: "Topo" });
+            if (mapIsVisible("openstreet")) visible_maps.push({ name: "openstreet", label: "OpenStreet" });
+            if (mapIsVisible("mapant")) visible_maps.push({ name: "mapant", label: "MapAnt" });
+
+            // Build buttons
+            visible_maps.forEach(({ name, label }) => {
+                const btn = document.createElement("button");
+                btn.textContent = label;
+                btn.dataset.name = name;
+                btn.style.fontSize = "12px";
+                btn.style.cursor = "pointer";
+                btn.onclick = () => showBase(name);
+                mapSwitchDiv.appendChild(btn);
+            });
+
+            // Add the control to map
+            map.controls[google.maps.ControlPosition.TOP_LEFT].push(mapSwitchDiv);
+
+            // Set default visible layer
+            showBase("google");
 
             // ------------------------------------------------------------
             // initMap: Init some variables
@@ -1713,7 +1853,7 @@
             gpsButton.addEventListener('click', function () {
                 map.panTo(current_location);
                 autoMove = true;
-                centerMarker.setVisible(!autoMove);
+                centerMarker.element.style.display = autoMove ? 'none' : 'block';
                 console.log("click Center Map:autoMove=true");
             });
             setDivStyle(gpsDiv);
@@ -1858,42 +1998,6 @@
             }
 
             // ------------------------------------------------------------
-            // initMap: Event listener for map type change (toggle stree view)
-
-            map.addListener('maptypeid_changed', function () {
-                var showStreetViewControl = true;
-                if (map.getMapTypeId() == 'peruskartta') {
-                    if (use_kapsi_maastokartat) {
-                        mapInfoTextDiv.innerHTML = 'Maanmittauslaitos, Kapsi';
-                    } else {
-                        mapInfoTextDiv.innerHTML = 'Maanmittauslaitos';
-                    }
-                    showStreetViewControl = false;
-                } else if (map.getMapTypeId() == 'ortokuvat') {
-                    if (use_kapsi_ortokuvat) {
-                        mapInfoTextDiv.innerHTML = 'Maanmittauslaitos, Kapsi';
-                    } else {
-                        mapInfoTextDiv.innerHTML = 'Maanmittauslaitos';
-                    }
-                    showStreetViewControl = false;
-                } else if (map.getMapTypeId() == 'mapant') {
-                    mapInfoTextDiv.innerHTML = 'Maanmittauslaitos, MapAnt';
-                    showStreetViewControl = false;
-                } else if (map.getMapTypeId() == 'opentopomap') {
-                    mapInfoTextDiv.innerHTML = 'OpenStreetMap, OpenTopoMap';
-                    showStreetViewControl = false;
-                } else if (map.getMapTypeId() == 'openstreetmap') {
-                    mapInfoTextDiv.innerHTML = 'OpenStreetMap';
-                    showStreetViewControl = false;
-                } else {
-                    mapInfoTextDiv.innerHTML = '';
-                }
-                map.setOptions({
-                    streetViewControl: showStreetViewControl
-                });
-            });
-
-            // ------------------------------------------------------------
             // initMap: Event listener for user moving the map manually
 
             map.addListener('dragstart', function () {
@@ -1901,7 +2005,7 @@
                     console.log('dragstart: set autoMove=false');
                 }
                 autoMove = false;
-                centerMarker.setVisible(!autoMove);
+                centerMarker.element.style.display = autoMove ? 'none' : 'block';
             });
 
             // ------------------------------------------------------------
@@ -1944,22 +2048,31 @@
                     // We are in measure distance mode.
                     console.log("click");
                     var pos = event.latLng;
+                    event.stop();
                     measureDistanceEvent(pos);
                 }
             });
 
             google.maps.event.addListener(map, 'touchend', function (event) {
                 if (measureDistanceMode != 0) {
-                    // We are in measure distance mode.
                     console.log("touchend");
-                    var touch = event.changedTouches[0];
-                    var point = new google.maps.Point(touch.clientX, touch.clientY);
-                    var pos = overlay.getProjection().fromContainerPixelToLatLng(point);
-                    console.log("touchend: " + pos);
-                    measureDistanceEvent(pos);
+                    // Get the touch position
+                    if (event.domEvent && event.domEvent.changedTouches) {
+                        var touch = event.domEvent.changedTouches[0];
+                        var point = new google.maps.Point(touch.clientX, touch.clientY);
+                        var pos = overlay.getProjection().fromContainerPixelToLatLng(point);
+                        console.log("touchend: " + pos);
+                        measureDistanceEvent(pos);
+                    }
                 }
             });
 
+            // Create overlay for coordinate projections
+            var overlay = new google.maps.OverlayView();
+            overlay.onAdd = function() {};
+            overlay.draw = function() {};
+            overlay.onRemove = function() {};
+            overlay.setMap(map);
 
             // ------------------------------------------------------------
             // Options for getting position
@@ -2062,6 +2175,16 @@
             console.log("startMeasureDistanceFromPos");
             measureDistancePath = [];
             measureDistanceLastPos = pos;
+            measureDistanceLength = 0;
+            var circle = distancePathCircle(pos, false); // Make first circle NOT clickable
+            measureDistancePath.push({ 
+                line: null, 
+                circle: circle, 
+                p1: pos, 
+                p2: pos, 
+                distance: 0,
+                length: 0 
+            });
             showMeasureDistance();
         }
 
@@ -2096,21 +2219,25 @@
         }
 
         function showMeasureDistance() {
+            var content = "";
+            
             if (measureDistanceMode == 1) {
                 infoWindow.close();
-                var content = "<p>Click or tap the map to set the starting point</p>";
-            } else if (measureDistanceLength == 0) {
+                content = "<p><strong>Measure Distance Mode</strong></p>";
+                content += "<p>Click or tap the map to set the starting point</p>";
+            } else if (measureDistancePath.length <= 1) {
                 infoWindow.close();
-                var circle = distancePathCircle(measureDistanceLastPos, false);
-                measureDistancePath.push({ line: null, circle: circle, p1: measureDistanceLastPos, p2: measureDistanceLastPos, distance: 0 });
-                var content = "<p>Click or tap on the map to add points to the path</p>";
+                content = "<p><strong>Measure Distance Mode</strong></p>";
+                content += "<p>Click or tap on the map to add points to the path</p>";
+                content += "<p>Distance: 0 m</p>";
             } else if (measureDistanceLength >= 10000) {
-                var content = "<p>Distance: " + (measureDistanceLength / 1000).toFixed(2) + " km</p>";
+                content = "<p><strong>Total Distance:</strong> " + (measureDistanceLength / 1000).toFixed(2) + " km</p>";
             } else {
-                var content = "<p>Distance: " + measureDistanceLength.toFixed(2) + " m</p>";
+                content = "<p><strong>Total Distance:</strong> " + measureDistanceLength.toFixed(2) + " m</p>";
             }
-            content += '<p><a href="javascript:undoMeasureDistance()" style="color:blue">Undo last point</a><br>';
-            content += '<a href="javascript:stopMeasureDistance()" style="color:blue">Stop measuring</a></p>';
+            
+            content += '<p><a href="javascript:undoMeasureDistance()" style="color:blue;cursor:pointer;">Undo last point</a><br>';
+            content += '<a href="javascript:stopMeasureDistance()" style="color:blue;cursor:pointer;">Stop measuring</a></p>';
 
             infoBottomWindow.setContent(content);
             infoBottomWindow.setPosition(infoBottomWindowPos);
@@ -2128,15 +2255,16 @@
             current_location = pos;
             if (marker) {
                 // move marker
-                marker.setPosition(current_location);
+                marker.position = current_location;
             } else {
                 // create marker
-                marker = new google.maps.Marker({
+                marker = new google.maps.marker.AdvancedMarkerElement({
                     position: current_location,
-                    map: map
+                    map: map,
+                    content: getPin('red') 
                 });
                 // click the marker to get coordinates
-                marker.addListener('click', function () {
+                marker.addListener('gmp-click', function () {
                     infoPopup.close();
                     infoWindow.close();
                     infoWindow.setPosition(current_location);
@@ -2238,21 +2366,9 @@
         }
 
     </script>
-    <script async defer src="https://maps.googleapis.com/maps/api/js?key=XXX API_KEY XXX&callback=initMap">
+    <script async
+          src="https://maps.googleapis.com/maps/api/js?key=XXX API_KEY XXX&callback=initMap&libraries=geometry,marker&loading=async">
     </script>
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/service-worker.js')
-                .then(registration => {
-                    console.log('Service Worker registered with scope:', registration.scope);
-                })
-                .catch(error => {
-                    console.log('Service Worker registration failed:', error);
-                });
-            });
-        }
-    </script>
-  </body>
+I   </body>
 
 </html>
