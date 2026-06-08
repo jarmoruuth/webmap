@@ -155,6 +155,11 @@
                 layer: null
             },
             {
+                name: 'Luolakartat', visible: false, type: 'geojson',
+                url: 'cave_maps.geojson',
+                layer: null
+            },
+            {
                 name: 'Maailmanperintökohteet', visible: false, type: 'kmlarray',
                 url: ['https://ruuth.xyz/maailmanperinto_kohteet_point.kml', 'https://ruuth.xyz/maailmanperinto_kohteet_region.kml'],
                 layer: null
@@ -710,6 +715,10 @@
                             preserveViewport: true,
                             suppressInfoWindows: false
                         });
+                } else if (layer.type == 'geojson') {
+                    console.log("loadLayer:GeoJSON, layer", layer.name);
+                    loadGeoJsonLayer(layer);
+                    return false;
                 } else {
                     console.log("loadLayer:error, unknown layer, layer=", layer.name);
                 }
@@ -857,7 +866,7 @@
                                             position: { lat: js[i].geometry.coordinates[0], lng: js[i].geometry.coordinates[1] },
                                             map: map,
                                             title: js[i].properties.n,
-                                            pin: getPin("blue")
+                                            content: getPin("blue")
                         });
                         marker.info = infotxt;
                         marker.addListener("gmp-click", () => {
@@ -886,6 +895,47 @@
         function hideActivityJSON(layer) {
             for (var i = 0; i < layer.length; i++) {
                 layer[i].setMap(null);
+            }
+        }
+
+        // ------------------------------------------------------------
+        // GeoJSON layer load/show/hide
+
+        function loadGeoJsonLayer(layer) {
+            console.log('loadGeoJsonLayer:start fetch', layer.name);
+            var dataLayer = new google.maps.Data();
+            dataLayer.loadGeoJson(layer.url, null, function(features) {
+                console.log('loadGeoJsonLayer:loaded features', features.length, layer.name);
+                layer.layer = dataLayer;
+                if (layer.visible) {
+                    dataLayer.setMap(map);
+                }
+            });
+            dataLayer.addListener('click', function(event) {
+                var feat = event.feature;
+                var html = '<table>';
+                feat.forEachProperty(function(value, name) {
+                    if (value !== null && value !== undefined) {
+                        var display = (typeof value === 'object') ? JSON.stringify(value) : value;
+                        html += '<tr><td>' + name + '</td><td>' + display + '</td></tr>';
+                    }
+                });
+                html += '</table>';
+                infoWindow.setContent(html);
+                infoWindow.setPosition(event.latLng);
+                infoWindow.open(map);
+            });
+        }
+
+        function showGeoJsonLayer(dataLayer) {
+            if (dataLayer) {
+                dataLayer.setMap(map);
+            }
+        }
+
+        function hideGeoJsonLayer(dataLayer) {
+            if (dataLayer) {
+                dataLayer.setMap(null);
             }
         }
 
@@ -1120,6 +1170,8 @@
                     }
                 } else if (layer.type == 'tiled_geojson') {
                     showTiledGeojsonLayer();
+                } else if (layer.type == 'geojson') {
+                    showGeoJsonLayer(layer.layer);
                 }
             }
         }
@@ -1147,6 +1199,8 @@
                     }
                 } else if (layer.type == 'tiled_geojson') {
                     hideTiledGeojsonLayer();
+                } else if (layer.type == 'geojson') {
+                    hideGeoJsonLayer(layer.layer);
                 }
             }
         }
