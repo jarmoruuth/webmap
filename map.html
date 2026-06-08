@@ -904,6 +904,29 @@
         function loadGeoJsonLayer(layer) {
             console.log('loadGeoJsonLayer:start fetch', layer.name);
             var dataLayer = new google.maps.Data();
+            var color = layer.color || '#1a73e8';
+            dataLayer.setStyle(function(feature) {
+                var geomType = feature.getGeometry().getType();
+                if (geomType === 'Point' || geomType === 'MultiPoint') {
+                    return {
+                        icon: {
+                            path: google.maps.SymbolPath.CIRCLE,
+                            scale: 8,
+                            fillColor: color,
+                            fillOpacity: 1,
+                            strokeColor: '#ffffff',
+                            strokeWeight: 1.5
+                        }
+                    };
+                } else {
+                    return {
+                        strokeColor: color,
+                        strokeWeight: 2,
+                        fillColor: color,
+                        fillOpacity: 0.2
+                    };
+                }
+            });
             dataLayer.loadGeoJson(layer.url, null, function(features) {
                 console.log('loadGeoJsonLayer:loaded features', features.length, layer.name);
                 layer.layer = dataLayer;
