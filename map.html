@@ -910,6 +910,30 @@
             dataLayer.setStyle(function(feature) {
                 var geomType = feature.getGeometry().getType();
                 if (geomType === 'Point' || geomType === 'MultiPoint') {
+                    // Check if description property from the GeoJSON feature is a bunker
+                    var description = feature.getProperty('description');
+                    var type = feature.getProperty('type');
+                    if (type === 'BunkkeriXL') {
+                        return {
+                            icon: {
+                                url: 'bunkkeriXL.png',
+                                scaledSize: new google.maps.Size(32, 32), // Size of the icon
+                                origin: new google.maps.Point(0, 0),
+                                anchor: new google.maps.Point(16, 16) // Anchor in the middle
+                            }
+                        };
+                    }
+                    if (description == 'Bunkkeri' || type === 'Bunkkeri') {
+                        return {
+                            icon: {
+                                url: 'bunkkeri.png',
+                                scaledSize: new google.maps.Size(32, 32), // Size of the icon
+                                origin: new google.maps.Point(0, 0),
+                                anchor: new google.maps.Point(16, 16) // Anchor in the middle
+                            }
+                        };
+                    }
+                    // Fallback to your default CIRCLE style for other points
                     return {
                         icon: {
                             path: google.maps.SymbolPath.CIRCLE,
