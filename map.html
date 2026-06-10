@@ -110,13 +110,13 @@
 
         var layers = [
             {
-                name: 'Lynx parenteesi', visible: false, type: 'kml',
-                url: 'https://ruuth.xyz/Lynx.kmz',
+                name: 'Lynx parenteesi', visible: false, type: 'geojson',
+                url: 'https://ruuth.xyz/Lynx.geojson',
                 layer: null
             },
             {
-                name: 'Parenteesipisteet', visible: false, type: 'kml',
-                url: 'https://ruuth.xyz/ParenteesiKirja.kmz',
+                name: 'Parenteesipisteet', visible: false, type: 'geojson',
+                url: 'https://ruuth.xyz/ParenteesiKirja.geojson',
                 layer: null
             },
             {
@@ -139,19 +139,21 @@
                 url: null,
                 layer: null
             },
+            /* Does not seem to work.
             {
                 name: 'Planetskier', visible: false, type: 'kml',
                 url: 'https://planetskier.net/locations.kmz',
                 layer: null
             },
+            */
             {
-                name: 'Espoon lähiretkiä', visible: false, type: 'kml',
-                url: 'https://ruuth.xyz/EspoonLahiretkia.kml',
+                name: 'Espoon lähiretkiä', visible: false, type: 'geojson',
+                url: 'https://ruuth.xyz/EspoonLahiretkia.geojson',
                 layer: null
             },
             {
-                name: 'Omat luolat', visible: false, type: 'kml',
-                url: 'https://ruuth.xyz/Omat_luolat.kmz',
+                name: 'Omat luolat', visible: false, type: 'geojson',
+                url: 'https://ruuth.xyz/Omat_luolat.geojson',
                 layer: null
             },
             {
@@ -160,8 +162,8 @@
                 layer: null
             },
             {
-                name: 'Maailmanperintökohteet', visible: false, type: 'kmlarray',
-                url: ['https://ruuth.xyz/maailmanperinto_kohteet_point.kml', 'https://ruuth.xyz/maailmanperinto_kohteet_region.kml'],
+                name: 'Maailmanperintökohteet', visible: false, type: 'geojson',
+                url: 'https://ruuth.xyz/maailmanperinto_kohteet.geojson',
                 layer: null
             },
             {
@@ -175,28 +177,28 @@
                 layer: null
             },
             {
-                name: 'Nimet 1 (luola)', visible: false, type: 'kml',
-                url: 'https://ruuth.xyz/Luolanimet.kml',
+                name: 'Nimet 1 (luola)', visible: false, type: 'geojson',
+                url: 'https://ruuth.xyz/Luolanimet.geojson',
                 layer: null
             },
             {
-                name: 'Nimet 2 (kirkko, kellari, kolo)', visible: false, type: 'kml',
-                url: 'https://ruuth.xyz/kirkko_kellari_kolo.kml',
+                name: 'Nimet 2 (kirkko, kellari, kolo)', visible: false, type: 'geojson',
+                url: 'https://ruuth.xyz/kirkko_kellari_kolo.geojson',
                 layer: null
             },
             {
-                name: 'Nimet 3 (piru, hiiden, kasaberget)', visible: false, type: 'kml',
-                url: 'https://ruuth.xyz/piru_hiiden_kasaberget.kml',
+                name: 'Nimet 3 (piru, hiiden, kasaberget)', visible: false, type: 'geojson',
+                url: 'https://ruuth.xyz/piru_hiiden_kasaberget.geojson',
                 layer: null
             },
             {
-                name: 'Lintutornit', visible: false, type: 'kml',
-                url: 'https://ruuth.xyz/Lintutornit.kmz',
+                name: 'Lintutornit', visible: false, type: 'geojson',
+                url: 'https://ruuth.xyz/Lintutornit.geojson',
                 layer: null
             },
             {
-                name: 'Lintujen ruokintapaikkoja', visible: false, type: 'kml',
-                url: 'https://ruuth.xyz/Lintujen_ruokintapaikkoja.kmz',
+                name: 'Lintujen ruokintapaikkoja', visible: false, type: 'geojson',
+                url: 'https://ruuth.xyz/Lintujen_ruokintapaikkoja.geojson',
                 layer: null
             }
         ];
